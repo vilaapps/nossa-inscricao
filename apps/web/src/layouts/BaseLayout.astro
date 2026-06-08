@@ -1,0 +1,102 @@
+---
+import { UserButton, SignInButton } from '@clerk/astro/components';
+
+interface Props {
+  title: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const {
+  title,
+  description = 'Plataforma de inscrições para eventos esportivos — rápida, segura e confiável.',
+  ogImage,
+} = Astro.props;
+
+// Trata URL canônica sem quebrar se Astro.site estiver indefinido
+const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'http://localhost:4321');
+
+const { userId } = Astro.locals.auth();
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="canonical" href={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} | SyncFlow</title>
+  </head>
+  <body class="flex flex-col min-h-dvh font-sans selection:bg-emerald-500/20 selection:text-emerald-400">
+    <!-- Header Minimal Tech / Asymmetric HUD -->
+    <header class="sticky top-0 z-50 w-full bg-[#0d0e12]/80 backdrop-blur-md border-b border-zinc-800/80">
+      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <!-- Logo -->
+        <a href="/" class="font-heading text-xl font-extrabold tracking-wider text-emerald-400 hover:opacity-90 transition-opacity">
+          SYNCFLOW<span class="text-white">.</span>
+        </a>
+
+        <!-- Navigation Links -->
+        <nav class="hidden md:flex items-center space-x-8 text-sm font-medium tracking-wide">
+          <a href="/" class="text-zinc-400 hover:text-white transition-colors duration-200">Eventos</a>
+          <a href="/painel" class="text-zinc-400 hover:text-white transition-colors duration-200">Minhas Inscrições</a>
+          <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+            <span class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+            Painel Admin
+          </a>
+        </nav>
+
+        <!-- Clerk Auth Actions -->
+        <div class="flex items-center space-x-4">
+          {userId ? (
+            <>
+              <!-- Link do Painel visivel no mobile -->
+              <a href="/painel" class="md:hidden text-xs text-zinc-400 hover:text-white">Inscrições</a>
+              <UserButton afterSignOutUrl="/" />
+            </>
+          ) : (
+            <div class="bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs px-4 py-2 uppercase tracking-widest font-semibold cursor-pointer transition-all duration-200">
+              <SignInButton mode="modal" />
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow flex flex-col">
+      <slot />
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full bg-[#08090c] border-t border-zinc-900 py-8 text-center text-xs text-zinc-600 font-medium tracking-widest uppercase">
+      <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>&copy; {new Date().getFullYear()} SYNCFLOW. TODOS OS DIREITOS RESERVADOS.</div>
+        <div class="flex items-center space-x-6 text-[10px]">
+          <a href="#" class="hover:text-zinc-400 transition-colors">Termos</a>
+          <a href="#" class="hover:text-zinc-400 transition-colors">Privacidade</a>
+          <a href="#" class="hover:text-zinc-400 transition-colors">Suporte</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>

@@ -1,0 +1,23 @@
+{
+  "name": "syncflow",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "workers:dev": "npm run dev --workspace=@syncflow/workers",
+    "api:dev": "npm run start:dev --workspace=api",
+    "web:dev": "npm run dev --workspace=web",
+    "postinstall": "prisma generate --schema=apps/api/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0",
+    "turbo": "^2.0.0"
+  }
+}

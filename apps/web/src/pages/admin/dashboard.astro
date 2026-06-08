@@ -1,0 +1,327 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { PrismaClient } from '@prisma/client';
+
+// Obter sessao do Clerk
+const auth = Astro.locals.auth();
+const userId = auth.userId;
+
+if (!userId) {
+  return Astro.redirect('/');
+}
+
+const prisma = new PrismaClient();
+
+// Buscar usuario no banco local para verificar role e tenant
+const user = await prisma.user.findUnique({
+  where: { id: userId },
+});
+
+if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
+  await prisma.$disconnect();
+  return Astro.redirect('/'); // Redireciona nao autorizados
+}
+
+const tenantId = user.tenantId || 'tenant-1'; // Fallback se admin geral
+
+// Buscar dados consolidados do Tenant
+const tenant = await prisma.tenant.findUnique({
+  where: { id: tenantId },
+});
+
+const events = await prisma.event.findMany({
+  where: { tenantId },
+  include: {
+    categories: true,
+    batches: true,
+    registrations: {
+      include: {
+        payment: true,
+      }
+    }
+  }
+});
+
+await prisma.$disconnect();
+
+// --- Cálculos Estatísticos ---
+
+// 1. Faturamento Total (inscrições com pagamento confirmado)
+let totalRevenue = 0;
+let totalRegistrationsCount = 0;
+let confirmedRegistrationsCount = 0;
+let pendingRegistrationsCount = 0;
+
+const eventStats = events.map(event => {
+  let eventRevenue = 0;
+  let eventConfirmed = 0;
+  let eventPending = 0;
+  
+  event.registrations.forEach(reg => {
+    totalRegistrationsCount++;
+    if (reg.paymentStatus === 'PAID' || reg.status === 'CONFIRMED') {
+      eventRevenue += Number(reg.amountPaid);
+      eventConfirmed++;
+      confirmedRegistrationsCount++;
+    } else if (reg.status === 'PENDING' || reg.status === 'QUEUED') {
+      eventPending++;
+      pendingRegistrationsCount++;
+    }
+  });
+
+  totalRevenue += eventRevenue;
+
+  // Ocupação de vagas
+  const totalSlots = event.availableSlots;
+  const occupancyRate = totalSlots > 0 ? (eventConfirmed / totalSlots) * 100 : 0;
+
+  return {
+    id: event.id,
+    title: event.title,
+    slug: event.slug,
+    revenue: eventRevenue,
+    confirmed: eventConfirmed,
+    pending: eventPending,
+    slots: totalSlots,
+    occupancy: occupancyRate,
+    date: event.date,
+  };
+});
+
+// Taxa de Conversão global
+const conversionRate = totalRegistrationsCount > 0 
+  ? (confirmedRegistrationsCount / totalRegistrationsCount) * 100 
+  : 0;
+
+// Ocupação Global
+const totalSlotsGlobal = events.reduce((sum, e) => sum + e.availableSlots, 0);
+const occupancyGlobal = totalSlotsGlobal > 0 
+  ? (confirmedRegistrationsCount / totalSlotsGlobal) * 100 
+  : 0;
+
+// --- Configuração dos Gráficos SVGs ---
+
+// ROSCA (Donut Chart) da Ocupação Global
+const r = 40;
+const circumference = 2 * Math.PI * r; // ~251.327
+const dashoffset = circumference - (occupancyGlobal / 100) * circumference;
+
+// GRÁFICO DE BARRAS do Faturamento por Evento
+const maxRevenue = Math.max(...eventStats.map(e => e.revenue), 100);
+const barGraphHeight = 160;
+---
+
+<BaseLayout title="Painel Organizador — Dashboard">
+  <!-- Top Title HUD -->
+  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
+      <div>
+        <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+          Painel de Controle Multi-Tenant // {tenant?.name || 'ADMIN'}
+        </div>
+        <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+          Dashboard Geral
+        </h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <a
+          href="/admin/eventos/novo"
+          class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-5 py-3 tracking-widest font-extrabold transition-all duration-200"
+        >
+          + Novo Evento
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Métricas Consolidadas -->
+  <section class="max-w-7xl mx-auto px-6 py-12 space-y-12 flex-grow w-full">
+    <!-- Grid de Métricas HUD -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-mono">
+      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Faturamento Líquido</div>
+        <div class="text-3xl font-bold text-white mt-2">
+          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenue)}
+        </div>
+        <div class="text-[9px] text-zinc-600 uppercase mt-2">Valores confirmados via PIX/Cartão</div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+      </div>
+
+      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Total de Inscrições</div>
+        <div class="text-3xl font-bold text-white mt-2">{totalRegistrationsCount}</div>
+        <div class="text-[9px] text-zinc-600 uppercase mt-2">
+          <span class="text-emerald-400 font-bold">{confirmedRegistrationsCount}</span> pagas // <span class="text-amber-500 font-bold">{pendingRegistrationsCount}</span> pendentes
+        </div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+      </div>
+
+      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Taxa de Conversão</div>
+        <div class="text-3xl font-bold text-emerald-400 mt-2">
+          {conversionRate.toFixed(1)}%
+        </div>
+        <div class="text-[9px] text-zinc-600 uppercase mt-2">Porcentagem de inscrições pagas</div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+      </div>
+
+      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Vagas Ocupadas</div>
+        <div class="text-3xl font-bold text-blue-400 mt-2">
+          {occupancyGlobal.toFixed(1)}%
+        </div>
+        <div class="text-[9px] text-zinc-600 uppercase mt-2">
+          {confirmedRegistrationsCount} vagas preenchidas de {totalSlotsGlobal}
+        </div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+      </div>
+    </div>
+
+    <!-- Gráficos Gerados em SVG (Faturamento e Ocupação) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Gráfico de Rosca SVG: Ocupação das Vagas -->
+      <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px]">
+        <div class="font-mono">
+          <h3 class="text-xs font-bold text-white uppercase tracking-wider">Ocupação Global de Vagas</h3>
+          <p class="text-zinc-500 text-[10px] uppercase mt-1">Status de reservas em lotes ativos</p>
+        </div>
+
+        <div class="relative flex items-center justify-center py-6">
+          <svg class="w-36 h-36 transform -rotate-90">
+            <!-- Circulo Fundo (Cinza escuro) -->
+            <circle
+              cx="72"
+              cy="72"
+              r={r}
+              class="stroke-zinc-800"
+              stroke-width="12"
+              fill="transparent"
+            />
+            <!-- Circulo Preenchimento (Azul Safira) -->
+            <circle
+              cx="72"
+              cy="72"
+              r={r}
+              class="stroke-blue-500 transition-all duration-1000 ease-out"
+              stroke-width="12"
+              fill="transparent"
+              stroke-dasharray={circumference}
+              stroke-dashoffset={dashoffset}
+              stroke-linecap="square"
+            />
+          </svg>
+          <!-- Texto centralizado com a porcentagem -->
+          <div class="absolute inset-0 flex flex-col items-center justify-center font-mono">
+            <span class="text-2xl font-bold text-white">{occupancyGlobal.toFixed(0)}%</span>
+            <span class="text-[8px] text-zinc-500 uppercase tracking-wider">Vagas Preenchidas</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-[10px] font-mono border-t border-zinc-800/60 pt-4">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+            <span class="text-zinc-400">Pagas: {confirmedRegistrationsCount}</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 bg-zinc-800 rounded-full"></span>
+            <span class="text-zinc-500">Restantes: {Math.max(0, totalSlotsGlobal - confirmedRegistrationsCount)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico de Barras SVG: Faturamento por Evento (2/3 colunas) -->
+      <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px] lg:col-span-2">
+        <div class="font-mono">
+          <h3 class="text-xs font-bold text-white uppercase tracking-wider">Faturamento por Competição</h3>
+          <p class="text-zinc-500 text-[10px] uppercase mt-1">Valores expressos em moeda nacional</p>
+        </div>
+
+        <!-- Renderizador do Gráfico de Barras SVG -->
+        <div class="relative w-full h-[180px] flex items-end pt-4 font-mono">
+          {eventStats.length === 0 ? (
+            <div class="w-full text-center text-zinc-600 text-xs py-8 uppercase">Nenhum evento registrado</div>
+          ) : (
+            <div class="w-full h-full flex items-end justify-around border-b border-zinc-800 pb-2">
+              {eventStats.map((item) => {
+                const barHeight = (item.revenue / maxRevenue) * barGraphHeight;
+                return (
+                  <div class="flex flex-col items-center w-full group relative">
+                    <!-- Tooltip HUD de Valor hover -->
+                    <div class="absolute -top-8 bg-zinc-950 border border-zinc-800 text-emerald-400 px-2 py-0.5 text-[9px] rounded-sm hidden group-hover:block transition-all shadow-xl">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.revenue)}
+                    </div>
+                    
+                    <!-- Barra SVG em CSS ou Caixa Retangular -->
+                    <div
+                      style={`height: ${Math.max(4, barHeight)}px;`}
+                      class="w-12 bg-emerald-500/20 border-t-2 border-emerald-500 hover:bg-emerald-500/30 transition-all duration-300 relative"
+                    ></div>
+                    
+                    <span class="text-[8px] text-zinc-500 uppercase mt-2 max-w-[80px] truncate text-center block">
+                      {item.title.split(' ')[0]} {item.title.split(' ')[1] || ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div class="text-[9px] text-zinc-600 uppercase font-mono border-t border-zinc-800/60 pt-4">
+          * Passe o cursor do mouse sobre a coluna correspondente para visualizar o faturamento detalhado.
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista Detalhada de Eventos com Ocupação HUD -->
+    <div class="space-y-6">
+      <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
+        Controle de Competições
+      </h3>
+
+      <div class="border border-zinc-800 overflow-x-auto">
+        <table class="w-full text-left font-mono text-xs border-collapse">
+          <thead>
+            <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+              <th class="p-4">Competição</th>
+              <th class="p-4">Data Prova</th>
+              <th class="p-4 text-center">Inscrições (Pagas/Total)</th>
+              <th class="p-4 text-center">Faturamento</th>
+              <th class="p-4">Progresso de Vagas</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+            {eventStats.map((item) => (
+              <tr class="hover:bg-[#1a1c25] transition-colors">
+                <td class="p-4 font-bold text-zinc-200 uppercase">{item.title}</td>
+                <td class="p-4 text-zinc-400">
+                  {new Date(item.date).toLocaleDateString('pt-BR')}
+                </td>
+                <td class="p-4 text-center text-zinc-300">
+                  <span class="text-emerald-400 font-bold">{item.confirmed}</span> / {item.confirmed + item.pending}
+                </td>
+                <td class="p-4 text-center text-emerald-400 font-bold">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.revenue)}
+                </td>
+                <td class="p-4 w-64">
+                  <div class="flex items-center gap-3">
+                    <!-- Barra de progresso horizontal HUD -->
+                    <div class="flex-grow h-2 bg-zinc-950 border border-zinc-800 rounded-none overflow-hidden relative">
+                      <div
+                        style={`width: ${item.occupancy}%`}
+                        class="h-full bg-blue-500 transition-all duration-500"
+                      ></div>
+                    </div>
+                    <span class="text-[10px] text-zinc-400 w-8">{item.occupancy.toFixed(0)}%</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,30 @@
+{
+  "name": "@syncflow/workers",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Async workers for SyncFlow - registration, payment, email, webhook processing",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "node --env-file=../../.env --import tsx --watch src/index.ts",
+    "build": "tsup src/index.ts --format cjs --dts",
+    "start": "node dist/index.js",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest watch",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0",
+    "@prisma/client": "^6.0.0",
+    "resend": "^4.0.0",
+    "@syncflow/shared": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

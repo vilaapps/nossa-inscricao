@@ -1,0 +1,232 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { PrismaClient } from '@prisma/client';
+
+// Obter sessao do Clerk
+const auth = Astro.locals.auth();
+const userId = auth.userId;
+
+if (!userId) {
+  return Astro.redirect('/');
+}
+
+const prisma = new PrismaClient();
+
+// Buscar as inscricoes do usuario logado
+const registrations = await prisma.registration.findMany({
+  where: { userId },
+  include: {
+    event: true,
+    category: true,
+    batch: true,
+    payment: true,
+  },
+  orderBy: { createdAt: 'desc' },
+});
+
+await prisma.$disconnect();
+
+// Formatador de data
+const formatDate = (date: Date) => {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+};
+
+// Formatar moeda
+const formatCurrency = (val: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(val);
+};
+
+// Mapeamento de Cores de Status
+const getStatusClasses = (status: string, paymentStatus: string) => {
+  if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
+    return {
+      bg: 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400',
+      label: 'Confirmada & Paga',
+      indicator: 'bg-emerald-500',
+    };
+  }
+  if (status === 'CANCELLED' || status === 'EXPIRED') {
+    return {
+      bg: 'bg-red-500/5 border-red-500/20 text-red-400',
+      label: 'Cancelada',
+      indicator: 'bg-red-500',
+    };
+  }
+  return {
+    bg: 'bg-amber-500/5 border-amber-500/20 text-amber-400',
+    label: 'Aguardando Pagamento',
+    indicator: 'bg-amber-500',
+  };
+};
+---
+
+<BaseLayout title="Minhas Inscrições — Painel do Participante">
+  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4 font-mono">
+      <div>
+        <div class="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Painel do Atleta</div>
+        <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+          Minhas Inscrições
+        </h1>
+      </div>
+      <div class="text-xs text-zinc-500 uppercase tracking-widest">
+        Participante ID: <span class="text-zinc-300">{userId.substring(0, 15)}...</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full">
+    {registrations.length === 0 ? (
+      <div class="border border-dashed border-zinc-800 p-16 text-center font-mono text-zinc-500 space-y-6">
+        <div>VOCÊ NÃO POSSUI NENHUMA INSCRIÇÃO ATIVA NO MOMENTO.</div>
+        <a
+          href="/"
+          class="inline-block bg-zinc-900 border border-zinc-800 hover:border-emerald-500 text-white text-xs uppercase px-8 py-3 tracking-widest font-semibold transition-all duration-200"
+        >
+          Navegar por Eventos
+        </a>
+      </div>
+    ) : (
+      <div class="space-y-8">
+        <!-- Grid de Cards de Inscrição -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {registrations.map((reg) => {
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus);
+            const isPending = reg.status === 'PENDING' || reg.status === 'QUEUED';
+            const pixCode = reg.payment?.pixQrCode;
+
+            return (
+              <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between relative group">
+                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-800 pointer-events-none group-hover:border-zinc-700 transition-colors"></div>
+
+                <div>
+                  <!-- Header do Card -->
+                  <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
+                    <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
+                    <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
+                      <span class={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator} ${isPending ? 'animate-pulse' : ''}`}></span>
+                      {statusConfig.label}
+                    </span>
+                  </div>
+
+                  <!-- Título do Evento -->
+                  <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider mb-2">
+                    {reg.event.title}
+                  </h3>
+
+                  <!-- Detalhes Físicos/Técnicos -->
+                  <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-400">
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Categoria</span>
+                      <span class="text-zinc-300 block mt-0.5">{reg.category.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Lote Adquirido</span>
+                      <span class="text-zinc-300 block mt-0.5">{reg.batch.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Valor Pago</span>
+                      <span class="text-zinc-200 font-bold block mt-0.5">{formatCurrency(Number(reg.amountPaid))}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Data Inscrição</span>
+                      <span class="text-zinc-300 block mt-0.5">{formatDate(reg.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Seção de Pagamento PIX Pendente -->
+                {isPending && pixCode && (
+                  <div class="border-t border-zinc-800/60 pt-6 mt-4 space-y-4 font-mono text-xs">
+                    <div class="bg-[#0d0e12] border border-zinc-800 p-4 space-y-3">
+                      <div class="flex items-center justify-between text-[10px]">
+                        <span class="text-amber-400 flex items-center gap-1.5">
+                          <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping"></span>
+                          PAGAMENTO PIX DISPONÍVEL
+                        </span>
+                        <span class="text-zinc-500">Gateway: Asaas</span>
+                      </div>
+                      
+                      <!-- QR Code Preview -->
+                      <div class="w-36 h-36 mx-auto bg-white p-2 border border-zinc-800">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(pixCode)}`}
+                          alt="QR Code PIX para pagamento"
+                          class="w-full h-full object-contain"
+                        />
+                      </div>
+
+                      {/* Pix Copia e Cola */}
+                      <div class="space-y-1">
+                        <span class="text-[9px] text-zinc-500 uppercase">PIX Copia e Cola</span>
+                        <div class="flex gap-1">
+                          <input
+                            type="text"
+                            readonly
+                            value={pixCode}
+                            class="bg-zinc-950 border border-zinc-800 text-zinc-400 px-2.5 py-2 text-[10px] flex-grow outline-none truncate"
+                          />
+                          <button
+                            class="pix-copy-btn bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 px-3 text-[10px]"
+                            data-pix={pixCode}
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+  </section>
+
+  <!-- Toast Notificação Cópia -->
+  <div
+    id="copy-toast"
+    class="fixed bottom-6 right-6 z-50 bg-[#15171f] border border-emerald-500/50 p-4 font-mono text-xs text-emerald-400 hidden shadow-2xl flex items-center gap-3"
+  >
+    <span class="w-2 h-2 bg-emerald-500 rounded-full inline-block"></span>
+    Código PIX copiado com sucesso!
+  </div>
+</BaseLayout>
+
+<script>
+  // Script client-side para gerenciar a cópia do PIX
+  const copyButtons = document.querySelectorAll('.pix-copy-btn');
+  const toast = document.getElementById('copy-toast');
+
+  if (copyButtons && toast) {
+    copyButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const pixCode = button.getAttribute('data-pix');
+        if (pixCode) {
+          navigator.clipboard.writeText(pixCode);
+          
+          // Feedback Visual do Botão
+          const prevText = (button as HTMLElement).innerText;
+          (button as HTMLElement).innerText = 'Copiado!';
+          
+          // Exibir Toast
+          toast.classList.remove('hidden');
+          
+          setTimeout(() => {
+            (button as HTMLElement).innerText = prevText;
+            toast.classList.add('hidden');
+          }, 3000);
+        }
+      });
+    });
+  }
+</script>

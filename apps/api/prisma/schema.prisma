@@ -1,0 +1,167 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id           String         @id
+  name         String
+  asaasApiKey  String?        // Chave do Asaas criptografada (exclusiva deste tenant)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  users        User[]
+  events       Event[]
+  categories   Category[]
+  batches      Batch[]
+  coupons      Coupon[]
+  registrations Registration[]
+  payments     Payment[]
+}
+
+model User {
+  id            String         @id // Clerk User ID
+  email         String         @unique
+  name          String?
+  role          String         @default("PARTICIPANT") // ADMIN, ORGANIZER, PARTICIPANT
+  tenantId      String?        // Tenant associado (se for organizador)
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  registrations Registration[]
+}
+
+model Event {
+  id             String         @id @default(uuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  slug           String         @unique
+  date           DateTime
+  status         String         @default("DRAFT") // DRAFT, PUBLISHED, CLOSED, CANCELLED
+  availableSlots Int            // Limite global de vagas do evento
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  categories     Category[]
+  batches        Batch[]
+  coupons        Coupon[]
+  registrations  Registration[]
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model Category {
+  id             String         @id @default(uuid())
+  eventId        String
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  name           String         // ex: "5k Geral", "10k Masculino"
+  gender         String         @default("MISTO") // MASCULINO, FEMININO, MISTO
+  minAge         Int?
+  maxAge         Int?
+  price          Decimal        @db.Decimal(10, 2)
+  availableSlots Int            // Vagas exclusivas da categoria
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  registrations  Registration[]
+
+  @@index([eventId])
+  @@index([tenantId])
+}
+
+model Batch {
+  id            String         @id @default(uuid())
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  name          String         // ex: "1º Lote", "Lote Promocional"
+  price         Decimal        @db.Decimal(10, 2)
+  startDate     DateTime?
+  endDate       DateTime?
+  maxQuantity   Int?           // Limite de vendas neste lote
+  soldQuantity  Int            @default(0)
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  registrations Registration[]
+
+  @@index([eventId])
+  @@index([tenantId])
+}
+
+model Coupon {
+  id            String         @id @default(uuid())
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  code          String         // ex: "CORRIDA10"
+  discountType  String         // PERCENTAGE, FIXED
+  discountValue Decimal        @db.Decimal(10, 2)
+  maxUses       Int?
+  usedCount     Int            @default(0)
+  validUntil    DateTime?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  registrations Registration[]
+
+  @@unique([eventId, code])
+  @@index([tenantId])
+}
+
+model Registration {
+  id            String         @id @default(uuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+  batchId       String
+  batch         Batch          @relation(fields: [batchId], references: [id])
+  userId        String         // Participante
+  user          User           @relation(fields: [userId], references: [id])
+  couponId      String?
+  coupon        Coupon?        @relation(fields: [couponId], references: [id])
+  status        String         @default("QUEUED") // QUEUED, PENDING, CONFIRMED, CANCELLED, REJECTED, EXPIRED
+  paymentStatus String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  amountPaid    Decimal        @db.Decimal(10, 2)
+  metadata      Json?          // dados customizados (tamanho da camiseta, etc.)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  payment       Payment?
+
+  @@index([tenantId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id               String       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  registrationId   String       @unique
+  registration     Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  asaasPaymentId   String?      @unique // ID retornado pelo Asaas
+  amount           Decimal      @db.Decimal(10, 2)
+  status           String       @default("PENDING") // PENDING, PAID, OVERDUE, REFUNDED, FAILED
+  method           String       // PIX, CREDIT_CARD
+  pixQrCode        String?      @db.Text // Texto do copia e cola PIX
+  pixExpiration    DateTime?
+  creditCardBrand  String?
+  creditCardLast4  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}

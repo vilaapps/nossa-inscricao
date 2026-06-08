@@ -1,0 +1,182 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+// Buscar todos os eventos publicados com seus lotes ativos para obter o preco base
+const events = await prisma.event.findMany({
+  where: { status: 'PUBLISHED' },
+  include: {
+    batches: {
+      where: { active: true },
+    },
+    categories: true,
+  },
+  orderBy: { date: 'asc' },
+});
+
+await prisma.$disconnect();
+
+// Formatador de data em Portugues
+const formatDate = (date: Date) => {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+};
+
+// Obter preco inicial (menor preco de lote ativo)
+const getStartingPrice = (event: any) => {
+  const activeBatches = event.batches.filter((b: any) => b.active);
+  if (activeBatches.length === 0) return 'Sob Consulta';
+  const minPrice = Math.min(...activeBatches.map((b: any) => Number(b.price)));
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(minPrice);
+};
+---
+
+<BaseLayout title="Eventos Esportivos Ativos">
+  <!-- Hero Section Brutalist / Minimal Tech -->
+  <section class="relative bg-[#08090c] border-b border-zinc-900 py-20 px-6 overflow-hidden">
+    <!-- Linhas horizontais de grade HUD -->
+    <div class="absolute inset-0 opacity-5 pointer-events-none">
+      <div class="w-full h-full bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+    </div>
+    
+    <div class="max-w-7xl mx-auto relative z-10 flex flex-col items-start">
+      <!-- Tag superior -->
+      <div class="flex items-center gap-2 mb-6 text-[10px] font-mono uppercase tracking-widest text-emerald-400">
+        <span class="w-1.5 h-1.5 bg-emerald-500 animate-pulse"></span>
+        Status do Sistema: Operacional
+      </div>
+
+      <!-- Headline brutalista massivo -->
+      <h1 class="font-heading text-5xl md:text-8xl font-black uppercase tracking-tight text-white mb-6 leading-none max-w-5xl">
+        INSCREVA-SE<br/>
+        <span class="text-zinc-600">E SUPERE OS</span><br/>
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500">LIMITES.</span>
+      </h1>
+
+      <!-- Subtitulo assimetrico e curto -->
+      <p class="text-zinc-400 font-sans text-base md:text-lg max-w-xl mb-8 leading-relaxed">
+        Plataforma inteligente multi-tenant com cronometragem instantânea e checkout dinâmico integrado para maratonas, ciclismo de estrada e ultra trail.
+      </p>
+
+      <!-- Stats do HUD na lateral inferior -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-zinc-800 pt-8 w-full max-w-3xl font-mono">
+        <div>
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Eventos Ativos</div>
+          <div class="text-2xl font-bold text-white mt-1">{events.length}</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Tempo de Resposta</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-1">45ms</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Vagas Preenchidas</div>
+          <div class="text-2xl font-bold text-white mt-1">87%</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Gateway</div>
+          <div class="text-2xl font-bold text-blue-400 mt-1">Asaas API</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filtro & Listagem de Eventos -->
+  <section class="max-w-7xl mx-auto px-6 py-16 flex-grow">
+    <!-- Header da Secao -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between border-b border-zinc-800 pb-6 mb-12 gap-4">
+      <div>
+        <h2 class="font-heading text-2xl font-bold uppercase tracking-wider text-white">Eventos Disponíveis</h2>
+        <p class="text-zinc-500 text-xs mt-1">Selecione uma competição e garanta seu lote com segurança.</p>
+      </div>
+
+      <!-- Barra de Filtro Estatica (Visual HUD) -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
+        <button class="bg-emerald-500/10 border border-emerald-500 text-emerald-400 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+          Todos
+        </button>
+        <button class="border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+          Corrida
+        </button>
+        <button class="border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+          Ciclismo
+        </button>
+        <button class="border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+          Ultra Trail
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid de Eventos -->
+    {events.length === 0 ? (
+      <div class="border border-dashed border-zinc-800 p-12 text-center text-zinc-500 font-mono">
+        NENHUM EVENTO ENCONTRADO NO SISTEMA.
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {events.map((event) => {
+          // Determina a modalidade com base no titulo ou slug para fins de badges
+          let categoryBadge = "CORRIDA";
+          if (event.slug.includes("ciclismo")) categoryBadge = "CICLISMO";
+          if (event.slug.includes("trail")) categoryBadge = "TRAIL RUN";
+
+          return (
+            <div class="group relative bg-[#15171f] border border-zinc-800 hover:border-emerald-500/40 p-6 flex flex-col justify-between transition-all duration-300">
+              <!-- Elemento de canto decorativo HUD -->
+              <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-transparent group-hover:border-emerald-400 transition-colors duration-300 pointer-events-none"></div>
+              
+              <div>
+                <!-- Tag e Status -->
+                <div class="flex items-center justify-between mb-4 font-mono text-[10px] tracking-widest">
+                  <span class="text-zinc-500 uppercase">{categoryBadge}</span>
+                  <span class="text-emerald-400 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                    INSCR. ABERTAS
+                  </span>
+                </div>
+
+                <!-- Titulo -->
+                <h3 class="font-heading text-lg font-bold text-white group-hover:text-emerald-400 transition-colors duration-200 line-clamp-2 uppercase">
+                  {event.title}
+                </h3>
+
+                <!-- Descricao Curta -->
+                <p class="text-zinc-500 text-sm mt-3 font-sans line-clamp-3 leading-relaxed">
+                  {event.description}
+                </p>
+              </div>
+
+              <div class="mt-8 pt-6 border-t border-zinc-800/60">
+                <div class="grid grid-cols-2 gap-4 mb-6 font-mono text-[11px]">
+                  <div>
+                    <span class="text-zinc-500 block uppercase">Data do Evento</span>
+                    <span class="text-zinc-300 mt-0.5 block">{formatDate(event.date)}</span>
+                  </div>
+                  <div>
+                    <span class="text-zinc-500 block uppercase">Valor Inicial</span>
+                    <span class="text-zinc-300 mt-0.5 block font-semibold">{getStartingPrice(event)}</span>
+                  </div>
+                </div>
+
+                <!-- CTA -->
+                <a
+                  href={`/eventos/${event.slug}`}
+                  class="block w-full text-center bg-zinc-900 border border-zinc-800 hover:border-emerald-500 hover:bg-emerald-500/10 text-white font-mono text-xs uppercase py-3 tracking-widest font-semibold transition-all duration-200"
+                >
+                  Ver Detalhes
+                </a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </section>
+</BaseLayout>

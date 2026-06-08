@@ -1,0 +1,47 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { PrismaClient } from '@prisma/client';
+import NewEventForm from '../../../components/react/NewEventForm';
+
+// Obter sessao do Clerk
+const auth = Astro.locals.auth();
+const userId = auth.userId;
+
+if (!userId) {
+  return Astro.redirect('/');
+}
+
+const prisma = new PrismaClient();
+
+// Validar role de organizador no banco de dados local
+const user = await prisma.user.findUnique({
+  where: { id: userId },
+});
+
+await prisma.$disconnect();
+
+if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
+  return Astro.redirect('/'); // Redireciona nao autorizados
+}
+---
+
+<BaseLayout title="Criar Nova Competição — Painel Organizador">
+  <!-- Cabeçalho HUD Simplificado -->
+  <section class="bg-[#08090c] border-b border-zinc-900 py-8 px-6">
+    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-[10px] tracking-widest text-zinc-500 gap-2">
+      <a href="/admin/dashboard" class="hover:text-emerald-400 transition-colors uppercase flex items-center gap-1.5 mb-2">
+        &larr; Voltar para o Dashboard
+      </a>
+      <div class="flex items-center gap-4">
+        <span class="text-emerald-400 font-bold">GERENCIAMENTO DE COMPETIÇÕES</span>
+        <span class="text-zinc-700">|</span>
+        <span class="text-zinc-400 font-semibold">CADASTRAR NOVO EVENTO</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Área do Formulário -->
+  <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full">
+    <NewEventForm client:load />
+  </section>
+</BaseLayout>
