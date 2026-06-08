@@ -36,3 +36,12 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Documentation
+DEVELOPMENT_SETUP.md
+
+# Other
+.env.dev
+.env.prd
+.env.prd.local
+.env.dev.local

@@ -3,9 +3,15 @@ import { prisma } from '../services/prisma.service';
 import { getQueue } from '../config/queues';
 import { QueueName } from '@syncflow/shared';
 import { RegistrationJobData, PaymentJobData, EmailJobData } from '@syncflow/shared';
+import { cleanupExpiredRegistrations } from './cleanup-expired-registrations.processor';
 
 // Processador da fila de inscrições concorrentes com locks pessimistas
 export async function processRegistration(job: Job<RegistrationJobData>): Promise<void> {
+  if (job.name === 'cleanup-expired-registrations') {
+    await cleanupExpiredRegistrations();
+    return;
+  }
+
   const { registrationId, userId, eventId, categoryId, batchId, tenantId, couponCode } = job.data;
 
   await prisma.$transaction(async (tx) => {
@@ -126,6 +132,25 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
         customerName: registration.user.name || 'Participante',
         customerCpf: metadataObj.cpf || '',
       };
+
+      if (method === 'CREDIT_CARD' && metadataObj.cardDetails) {
+        const card = metadataObj.cardDetails;
+        paymentJobData.creditCard = {
+          holderName: card.holderName,
+          number: card.number,
+          expiryMonth: card.expiryMonth,
+          expiryYear: card.expiryYear,
+          ccv: card.ccv,
+        };
+        paymentJobData.creditCardHolderInfo = {
+          name: card.holderName,
+          email: registration.user.email,
+          cpfCnpj: card.holderCpf || metadataObj.cpf || '',
+          postalCode: card.holderZipCode || '',
+          phone: metadataObj.phone || '21999999999',
+          addressNumber: 'S/N',
+        };
+      }
 
       await paymentQueue.add('process-payment', paymentJobData);
 

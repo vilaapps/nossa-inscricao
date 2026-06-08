@@ -25,6 +25,9 @@ vi.mock('../services/prisma.service', () => {
       payment: {
         upsert: vi.fn(),
       },
+      registration: {
+        update: vi.fn(),
+      },
     },
   };
 });
@@ -60,20 +63,7 @@ describe('Payment Processor', () => {
     vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce(null);
 
     // Act & Assert
-    await expect(processPayment(job)).rejects.toThrow('Asaas API Key not configured for tenant ten_none');
-  });
-
-  // deve lancar erro se a chave do Asaas nao estiver configurada
-  it('should throw an error if the tenant asaasApiKey is missing', async () => {
-    // Arrange
-    const job = createMockJob({ tenantId: 'ten_1' });
-    vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
-      id: 'ten_1',
-      asaasApiKey: null,
-    } as any);
-
-    // Act & Assert
-    await expect(processPayment(job)).rejects.toThrow('Asaas API Key not configured for tenant ten_1');
+    await expect(processPayment(job)).rejects.toThrow('Tenant ten_none not found');
   });
 
   // deve processar pagamento via PIX com sucesso
@@ -91,7 +81,6 @@ describe('Payment Processor', () => {
 
     vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
       id: 'ten_1',
-      asaasApiKey: 'key_123',
     } as any);
 
     vi.mocked(asaasService.createCustomer).mockResolvedValueOnce('cus_123');
@@ -109,7 +98,7 @@ describe('Payment Processor', () => {
       name: 'Astro Customer',
       email: 'customer@test.com',
       cpfCnpj: '123.456.789-00',
-    }, 'key_123');
+    });
 
     expect(asaasService.createPayment).toHaveBeenCalledWith({
       customerId: 'cus_123',
@@ -117,14 +106,14 @@ describe('Payment Processor', () => {
       value: 150.00,
       dueDate: expect.any(String),
       externalReference: 'reg_1',
-    }, 'key_123');
+    });
 
     expect(prisma.payment.upsert).toHaveBeenCalledWith({
       where: { registrationId: 'reg_1' },
       create: {
         tenantId: 'ten_1',
         registrationId: 'reg_1',
-        asaasPaymentId: 'pay_asaas_123',
+        gatewayPaymentId: 'pay_asaas_123',
         amount: 150.00,
         status: 'PENDING',
         method: 'PIX',
@@ -132,7 +121,7 @@ describe('Payment Processor', () => {
         pixExpiration: new Date('2026-06-08T23:59:59.000Z'),
       },
       update: {
-        asaasPaymentId: 'pay_asaas_123',
+        gatewayPaymentId: 'pay_asaas_123',
         status: 'PENDING',
         pixQrCode: 'pix-copia-e-cola-code',
         pixExpiration: new Date('2026-06-08T23:59:59.000Z'),
@@ -162,16 +151,32 @@ describe('Payment Processor', () => {
       method: 'CREDIT_CARD',
       customerEmail: 'customer@test.com',
       customerName: 'Astro Card Holder',
-      customerCpf: null, // Testando fallback cpfCnpj || undefined
+      customerCpf: null,
+      creditCard: {
+        holderName: 'Astro Card Holder',
+        number: '1234123412341234',
+        expiryMonth: '12',
+        expiryYear: '2030',
+        ccv: '123',
+      },
+      creditCardHolderInfo: {
+        name: 'Astro Card Holder',
+        email: 'customer@test.com',
+        cpfCnpj: '123.456.789-00',
+        postalCode: '12345-678',
+        phone: '21999999999',
+      },
     });
 
     vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
       id: 'ten_1',
-      asaasApiKey: 'key_123',
     } as any);
 
     vi.mocked(asaasService.createCustomer).mockResolvedValueOnce('cus_456');
-    vi.mocked(asaasService.createPayment).mockResolvedValueOnce({ id: 'pay_asaas_456' });
+    vi.mocked(asaasService.createPayment).mockResolvedValueOnce({
+      id: 'pay_asaas_456',
+      status: 'CONFIRMED',
+    });
 
     // Act
     await processPayment(job);
@@ -181,7 +186,7 @@ describe('Payment Processor', () => {
       name: 'Astro Card Holder',
       email: 'customer@test.com',
       cpfCnpj: '',
-    }, 'key_123');
+    });
 
     expect(asaasService.createPayment).toHaveBeenCalledWith({
       customerId: 'cus_456',
@@ -189,26 +194,46 @@ describe('Payment Processor', () => {
       value: 250.00,
       dueDate: expect.any(String),
       externalReference: 'reg_1',
-    }, 'key_123');
+      creditCard: {
+        holderName: 'Astro Card Holder',
+        number: '1234123412341234',
+        expiryMonth: '12',
+        expiryYear: '2030',
+        ccv: '123',
+      },
+      creditCardHolderInfo: {
+        name: 'Astro Card Holder',
+        email: 'customer@test.com',
+        cpfCnpj: '123.456.789-00',
+        postalCode: '12345-678',
+        phone: '21999999999',
+      },
+    });
 
     expect(prisma.payment.upsert).toHaveBeenCalledWith({
       where: { registrationId: 'reg_1' },
       create: {
         tenantId: 'ten_1',
         registrationId: 'reg_1',
-        asaasPaymentId: 'pay_asaas_456',
+        gatewayPaymentId: 'pay_asaas_456',
         amount: 250.00,
-        status: 'PENDING',
+        status: 'PAID',
         method: 'CREDIT_CARD',
       },
       update: {
-        asaasPaymentId: 'pay_asaas_456',
-        status: 'PENDING',
+        gatewayPaymentId: 'pay_asaas_456',
+        status: 'PAID',
       },
     });
 
-    // E-mail de PIX não deve ser enviado
-    expect(mockEmailQueue.add).not.toHaveBeenCalled();
+    expect(prisma.registration.update).toHaveBeenCalledWith({
+      where: { id: 'reg_1' },
+      data: {
+        paymentStatus: 'PAID',
+        amountPaid: 250.00,
+        status: 'CONFIRMED',
+      },
+    });
   });
 
   // deve processar pagamento via PIX sem expiração definida no Asaas
@@ -226,14 +251,13 @@ describe('Payment Processor', () => {
 
     vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
       id: 'ten_1',
-      asaasApiKey: 'key_123',
     } as any);
 
     vi.mocked(asaasService.createCustomer).mockResolvedValueOnce('cus_123');
     vi.mocked(asaasService.createPayment).mockResolvedValueOnce({ id: 'pay_asaas_123' });
     vi.mocked(asaasService.getPixQrCode).mockResolvedValueOnce({
       payload: 'pix-payload-without-exp',
-      expirationDate: null, // Expiracao nula
+      expirationDate: null,
     });
 
     // Act
@@ -246,6 +270,54 @@ describe('Payment Processor', () => {
       }),
       update: expect.objectContaining({
         pixExpiration: null,
+      }),
+    }));
+  });
+
+  // deve processar pagamento via CREDIT_CARD com status RECEIVED
+  it('should process payment via CREDIT_CARD and set status to PAID when asaas status is RECEIVED', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_1',
+      tenantId: 'ten_1',
+      amount: 250.00,
+      method: 'CREDIT_CARD',
+      customerEmail: 'customer@test.com',
+      customerName: 'Astro Card Holder',
+      customerCpf: null,
+      creditCard: {
+        holderName: 'Astro Card Holder',
+        number: '1234123412341234',
+        expiryMonth: '12',
+        expiryYear: '2030',
+        ccv: '123',
+      },
+      creditCardHolderInfo: {
+        name: 'Astro Card Holder',
+        email: 'customer@test.com',
+        cpfCnpj: '123.456.789-00',
+        postalCode: '12345-678',
+        phone: '21999999999',
+      },
+    });
+
+    vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
+      id: 'ten_1',
+    } as any);
+
+    vi.mocked(asaasService.createCustomer).mockResolvedValueOnce('cus_456');
+    vi.mocked(asaasService.createPayment).mockResolvedValueOnce({
+      id: 'pay_asaas_456',
+      status: 'RECEIVED',
+    });
+
+    // Act
+    await processPayment(job);
+
+    // Assert
+    expect(prisma.payment.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        status: 'PAID',
       }),
     }));
   });

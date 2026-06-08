@@ -22,7 +22,6 @@ async function main() {
     data: {
       id: 'tenant-1',
       name: 'Corrida Brasil Organizações',
-      asaasApiKey: '$aact_YTUxYjRiMWMtOTk3NS00M2I0LTkxZjEtNTQ1NWE5YjIyYTg1', // Chave mockada do Asaas
     },
   });
   console.log(`🏢 Tenant criado: ${tenant.name} (${tenant.id})`);
@@ -336,7 +335,7 @@ async function main() {
       status: 'PAID',
       method: 'PIX',
       pixQrCode: '00020101021226830014br.gov.bcb.pix2561api.asaas.com/v2/pix/qr/pay/mock_pay_1',
-      asaasPaymentId: 'pay_mock_asaas_123',
+      gatewayPaymentId: 'pay_mock_asaas_123',
     },
   });
 
@@ -364,7 +363,7 @@ async function main() {
       status: 'PENDING',
       method: 'PIX',
       pixQrCode: '00020101021226830014br.gov.bcb.pix2561api.asaas.com/v2/pix/qr/pay/mock_pay_trail_2',
-      asaasPaymentId: 'pay_mock_asaas_456',
+      gatewayPaymentId: 'pay_mock_asaas_456',
       pixExpiration: new Date(Date.now() + 24 * 60 * 60 * 1000), // expira em 24h
     },
   });

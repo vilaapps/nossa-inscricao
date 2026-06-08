@@ -93,7 +93,7 @@ describe('RegistrationsService', () => {
           status: 'QUEUED',
           paymentStatus: 'PENDING',
           amountPaid: 0,
-          metadata: { size: 'G' },
+          metadata: { size: 'G', paymentMethod: 'PIX', cardDetails: null },
         },
       });
       expect(mockQueue.add).toHaveBeenCalledWith(

@@ -77,7 +77,11 @@ export class RegistrationsService {
         status: 'QUEUED',
         paymentStatus: 'PENDING',
         amountPaid: 0,
-        metadata: (complementaryData || {}) as any,
+        metadata: {
+          ...(complementaryData || {}),
+          paymentMethod: dto.paymentMethod || 'PIX',
+          cardDetails: dto.cardDetails || null,
+        } as any,
       },
     });
 

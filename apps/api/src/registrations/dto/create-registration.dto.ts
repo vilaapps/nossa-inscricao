@@ -26,4 +26,22 @@ export class CreateRegistrationDto {
   @IsObject()
   @IsOptional()
   complementaryData?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Método de pagamento selecionado', enum: ['PIX', 'CREDIT_CARD'] })
+  @IsString()
+  @IsOptional()
+  paymentMethod?: 'PIX' | 'CREDIT_CARD';
+
+  @ApiPropertyOptional({ description: 'Dados do cartão de crédito' })
+  @IsObject()
+  @IsOptional()
+  cardDetails?: {
+    holderName: string;
+    number: string;
+    expiryMonth: string;
+    expiryYear: string;
+    ccv: string;
+    holderCpf?: string;
+    holderZipCode?: string;
+  };
 }

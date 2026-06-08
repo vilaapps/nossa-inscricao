@@ -13,93 +13,202 @@ if (!userId) {
 const prisma = new PrismaClient();
 
 // Buscar usuario no banco local para verificar role e tenant
-const user = await prisma.user.findUnique({
+let user = await prisma.user.findUnique({
   where: { id: userId },
 });
 
-if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
-  await prisma.$disconnect();
-  return Astro.redirect('/'); // Redireciona nao autorizados
+// Se o usuário não existir localmente, criamos o cadastro inicial como PARTICIPANT ou ADMIN
+if (!user) {
+  const clerkUser = await Astro.locals.currentUser();
+  if (!clerkUser) {
+    await prisma.$disconnect();
+    return Astro.redirect('/');
+  }
+  const email = clerkUser.emailAddresses[0]?.emailAddress || '';
+  const name = clerkUser.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : '';
+  
+  const isSuperAdmin = email === 'nossainscricao@gmail.com';
+  
+  if (isSuperAdmin) {
+    await prisma.tenant.upsert({
+      where: { id: 'tenant-platform' },
+      update: {},
+      create: {
+        id: 'tenant-platform',
+        name: 'Plataforma Nossa Inscrição',
+        commissionRate: 10.00,
+      }
+    });
+
+    user = await prisma.user.create({
+      data: {
+        id: userId,
+        email,
+        name,
+        role: 'ADMIN',
+        tenantId: 'tenant-platform',
+      }
+    });
+  } else {
+    user = await prisma.user.create({
+      data: {
+        id: userId,
+        email,
+        name,
+        role: 'PARTICIPANT',
+      }
+    });
+  }
 }
 
-const tenantId = user.tenantId || 'tenant-1'; // Fallback se admin geral
+const isSuperAdmin = user.role === 'ADMIN';
+const isOrganizer = user.role === 'ORGANIZER';
+const isParticipant = user.role === 'PARTICIPANT';
 
-// Buscar dados consolidados do Tenant
-const tenant = await prisma.tenant.findUnique({
-  where: { id: tenantId },
-});
+let tenant = null;
+let events = [];
+let pendingEvents = [];
+let allTenants = [];
 
-const events = await prisma.event.findMany({
-  where: { tenantId },
-  include: {
-    categories: true,
-    batches: true,
-    registrations: {
-      include: {
-        payment: true,
+if (isSuperAdmin) {
+  // Super Admin: Buscar todos os eventos
+  events = await prisma.event.findMany({
+    include: {
+      tenant: true,
+      categories: true,
+      batches: true,
+      registrations: {
+        include: {
+          payment: true,
+        }
       }
     }
-  }
-});
+  });
+
+  // Eventos pendentes de aprovação
+  pendingEvents = await prisma.event.findMany({
+    where: { status: 'DRAFT' },
+    include: {
+      tenant: true,
+    }
+  });
+
+  // Todos os tenants cadastrados
+  allTenants = await prisma.tenant.findMany({
+    include: {
+      users: {
+        where: { role: 'ORGANIZER' }
+      }
+    }
+  });
+} else if (isOrganizer) {
+  // Organizador
+  const tenantId = user.tenantId || 'tenant-1';
+  tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+  });
+
+  events = await prisma.event.findMany({
+    where: { tenantId },
+    include: {
+      categories: true,
+      batches: true,
+      registrations: {
+        include: {
+          payment: true,
+        }
+      }
+    }
+  });
+}
 
 await prisma.$disconnect();
 
-// --- Cálculos Estatísticos ---
-
-// 1. Faturamento Total (inscrições com pagamento confirmado)
+// --- Cálculos Estatísticos para Organizador ---
 let totalRevenue = 0;
 let totalRegistrationsCount = 0;
 let confirmedRegistrationsCount = 0;
 let pendingRegistrationsCount = 0;
+let eventStats = [];
 
-const eventStats = events.map(event => {
-  let eventRevenue = 0;
-  let eventConfirmed = 0;
-  let eventPending = 0;
+if (isOrganizer && tenant) {
+  const feeRate = Number(tenant.commissionRate || 10) / 100;
   
-  event.registrations.forEach(reg => {
-    totalRegistrationsCount++;
-    if (reg.paymentStatus === 'PAID' || reg.status === 'CONFIRMED') {
-      eventRevenue += Number(reg.amountPaid);
-      eventConfirmed++;
-      confirmedRegistrationsCount++;
-    } else if (reg.status === 'PENDING' || reg.status === 'QUEUED') {
-      eventPending++;
-      pendingRegistrationsCount++;
-    }
+  eventStats = events.map(event => {
+    let eventRevenue = 0;
+    let eventConfirmed = 0;
+    let eventPending = 0;
+    
+    event.registrations.forEach(reg => {
+      totalRegistrationsCount++;
+      if (reg.paymentStatus === 'PAID' || reg.status === 'CONFIRMED') {
+        // Deduz comissão parametrizada da plataforma
+        eventRevenue += Number(reg.amountPaid) * (1 - feeRate);
+        eventConfirmed++;
+        confirmedRegistrationsCount++;
+      } else if (reg.status === 'PENDING' || reg.status === 'QUEUED') {
+        eventPending++;
+        pendingRegistrationsCount++;
+      }
+    });
+
+    totalRevenue += eventRevenue;
+
+    const totalSlots = event.availableSlots;
+    const occupancyRate = totalSlots > 0 ? (eventConfirmed / totalSlots) * 100 : 0;
+
+    return {
+      id: event.id,
+      title: event.title,
+      slug: event.slug,
+      status: event.status,
+      revenue: eventRevenue,
+      confirmed: eventConfirmed,
+      pending: eventPending,
+      slots: totalSlots,
+      occupancy: occupancyRate,
+      date: event.date,
+    };
   });
+}
 
-  totalRevenue += eventRevenue;
+// --- Cálculos Estatísticos para Super Admin ---
+let adminStats = {
+  totalRevenueGlobal: 0,
+  totalCommissionsGlobal: 0,
+  totalRegistrationsGlobal: 0,
+  confirmedRegistrationsGlobal: 0,
+  activeEventsCount: 0,
+};
 
-  // Ocupação de vagas
-  const totalSlots = event.availableSlots;
-  const occupancyRate = totalSlots > 0 ? (eventConfirmed / totalSlots) * 100 : 0;
+if (isSuperAdmin) {
+  events.forEach(event => {
+    if (event.status === 'PUBLISHED') {
+      adminStats.activeEventsCount++;
+    }
+    const rate = Number(event.tenant?.commissionRate || 10) / 100;
+    event.registrations.forEach(reg => {
+      adminStats.totalRegistrationsGlobal++;
+      if (reg.paymentStatus === 'PAID' || reg.status === 'CONFIRMED') {
+        const val = Number(reg.amountPaid);
+        adminStats.totalRevenueGlobal += val;
+        adminStats.totalCommissionsGlobal += val * rate;
+        adminStats.confirmedRegistrationsGlobal++;
+      }
+    });
+  });
+}
 
-  return {
-    id: event.id,
-    title: event.title,
-    slug: event.slug,
-    revenue: eventRevenue,
-    confirmed: eventConfirmed,
-    pending: eventPending,
-    slots: totalSlots,
-    occupancy: occupancyRate,
-    date: event.date,
-  };
-});
-
-// Taxa de Conversão global
+// Taxa de Conversão global (Organizador)
 const conversionRate = totalRegistrationsCount > 0 
   ? (confirmedRegistrationsCount / totalRegistrationsCount) * 100 
   : 0;
 
-// Ocupação Global
+// Ocupação Global (Organizador)
 const totalSlotsGlobal = events.reduce((sum, e) => sum + e.availableSlots, 0);
 const occupancyGlobal = totalSlotsGlobal > 0 
   ? (confirmedRegistrationsCount / totalSlotsGlobal) * 100 
   : 0;
-
-// --- Configuração dos Gráficos SVGs ---
 
 // ROSCA (Donut Chart) da Ocupação Global
 const r = 40;
@@ -111,217 +220,559 @@ const maxRevenue = Math.max(...eventStats.map(e => e.revenue), 100);
 const barGraphHeight = 160;
 ---
 
-<BaseLayout title="Painel Organizador — Dashboard">
-  <!-- Top Title HUD -->
-  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
-      <div>
-        <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-          Painel de Controle Multi-Tenant // {tenant?.name || 'ADMIN'}
-        </div>
-        <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
-          Dashboard Geral
-        </h1>
+<BaseLayout title={isParticipant ? "Seja um Organizador — Onboarding" : isSuperAdmin ? "Painel Geral de Moderação" : "Painel Organizador — Dashboard"}>
+  
+  {isParticipant && (
+    <!-- TELA DE ONBOARDING: PARTICIPANTE -> ORGANIZADOR -->
+    <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+      <div class="max-w-xl mx-auto font-mono text-[10px] tracking-widest text-zinc-500 text-center">
+        <span class="text-emerald-400 font-bold">PORTAL DE ORGANIZADORES</span>
+        <span class="text-zinc-700 mx-2">|</span>
+        <span class="text-zinc-400 font-semibold">CADASTRO DE PARCEIRO</span>
       </div>
-      <div class="flex items-center gap-4">
-        <a
-          href="/admin/eventos/novo"
-          class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-5 py-3 tracking-widest font-extrabold transition-all duration-200"
-        >
-          + Novo Evento
-        </a>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Métricas Consolidadas -->
-  <section class="max-w-7xl mx-auto px-6 py-12 space-y-12 flex-grow w-full">
-    <!-- Grid de Métricas HUD -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-mono">
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Faturamento Líquido</div>
-        <div class="text-3xl font-bold text-white mt-2">
-          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenue)}
-        </div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">Valores confirmados via PIX/Cartão</div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
-      </div>
-
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Total de Inscrições</div>
-        <div class="text-3xl font-bold text-white mt-2">{totalRegistrationsCount}</div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">
-          <span class="text-emerald-400 font-bold">{confirmedRegistrationsCount}</span> pagas // <span class="text-amber-500 font-bold">{pendingRegistrationsCount}</span> pendentes
-        </div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
-      </div>
-
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Taxa de Conversão</div>
-        <div class="text-3xl font-bold text-emerald-400 mt-2">
-          {conversionRate.toFixed(1)}%
-        </div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">Porcentagem de inscrições pagas</div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
-      </div>
-
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Vagas Ocupadas</div>
-        <div class="text-3xl font-bold text-blue-400 mt-2">
-          {occupancyGlobal.toFixed(1)}%
-        </div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">
-          {confirmedRegistrationsCount} vagas preenchidas de {totalSlotsGlobal}
-        </div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
-      </div>
-    </div>
-
-    <!-- Gráficos Gerados em SVG (Faturamento e Ocupação) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      
-      <!-- Gráfico de Rosca SVG: Ocupação das Vagas -->
-      <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px]">
-        <div class="font-mono">
-          <h3 class="text-xs font-bold text-white uppercase tracking-wider">Ocupação Global de Vagas</h3>
-          <p class="text-zinc-500 text-[10px] uppercase mt-1">Status de reservas em lotes ativos</p>
+    <section class="max-w-xl mx-auto px-6 py-20 flex-grow w-full font-mono">
+      <div class="bg-[#15171f] border border-zinc-800 p-8 relative">
+        <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+        
+        <div class="mb-8">
+          <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5 justify-center">
+            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            Traga seu evento para o SyncFlow
+          </div>
+          <h2 class="font-heading text-2xl font-extrabold text-white uppercase tracking-wider text-center">Seja um Organizador</h2>
+          <p class="text-zinc-500 text-xs mt-3 font-sans text-center leading-relaxed">
+            Cadastre os dados de sua organização ou assessoria abaixo para liberar a criação de competições e venda de inscrições. Você continuará podendo participar de eventos como atleta com a mesma conta.
+          </p>
         </div>
 
-        <div class="relative flex items-center justify-center py-6">
-          <svg class="w-36 h-36 transform -rotate-90">
-            <!-- Circulo Fundo (Cinza escuro) -->
-            <circle
-              cx="72"
-              cy="72"
-              r={r}
-              class="stroke-zinc-800"
-              stroke-width="12"
-              fill="transparent"
+        <form id="onboarding-form" class="space-y-6 text-xs text-zinc-400">
+          <div class="space-y-2">
+            <label for="orgName" class="text-[10px] uppercase block tracking-wider font-bold">Nome da Organização / Assessoria</label>
+            <input
+              type="text"
+              id="orgName"
+              required
+              placeholder="EX: CORRIDA BRASIL ORGANIZAÇÕES"
+              class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
             />
-            <!-- Circulo Preenchimento (Azul Safira) -->
-            <circle
-              cx="72"
-              cy="72"
-              r={r}
-              class="stroke-blue-500 transition-all duration-1000 ease-out"
-              stroke-width="12"
-              fill="transparent"
-              stroke-dasharray={circumference}
-              stroke-dashoffset={dashoffset}
-              stroke-linecap="square"
-            />
-          </svg>
-          <!-- Texto centralizado com a porcentagem -->
-          <div class="absolute inset-0 flex flex-col items-center justify-center font-mono">
-            <span class="text-2xl font-bold text-white">{occupancyGlobal.toFixed(0)}%</span>
-            <span class="text-[8px] text-zinc-500 uppercase tracking-wider">Vagas Preenchidas</span>
           </div>
+
+          <div class="space-y-2">
+            <label for="cpfCnpj" class="text-[10px] uppercase block tracking-wider font-bold">CPF ou CNPJ</label>
+            <input
+              type="text"
+              id="cpfCnpj"
+              required
+              placeholder="EX: 00.000.000/0001-00"
+              class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+            />
+          </div>
+
+          <div id="error-message" class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 hidden uppercase"></div>
+          <div id="success-message" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 hidden uppercase flex items-center gap-2">
+            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+            Cadastro concluído! Redirecionando...
+          </div>
+
+          <button
+            type="submit"
+            class="w-full bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase py-4 tracking-widest font-extrabold transition-all duration-200 cursor-pointer"
+          >
+            CONFIRMAR PARCERIA &rarr;
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <script is:inline define:vars={{ userEmail: user.email, userName: user.name }}>
+      const form = document.getElementById('onboarding-form');
+      const errorDiv = document.getElementById('error-message');
+      const successDiv = document.getElementById('success-message');
+
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+
+        const orgName = document.getElementById('orgName').value;
+        const cpfCnpj = document.getElementById('cpfCnpj').value;
+
+        try {
+          const response = await fetch('/api/admin/tornar-organizador', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              organizationName: orgName,
+              cpfCnpj,
+              email: userEmail,
+              name: userName
+            })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.message || 'Erro ao realizar o onboarding.');
+          }
+
+          successDiv.classList.remove('hidden');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+
+        } catch (err) {
+          errorDiv.textContent = '✕ ' + err.message;
+          errorDiv.classList.remove('hidden');
+        }
+      });
+    </script>
+  )}
+
+  {isSuperAdmin && (
+    <!-- TELA DO SUPER ADMIN (PLATAFORMA) -->
+    <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            Super Admin Geral da Plataforma // {user.email}
+          </div>
+          <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+            Painel Geral
+          </h1>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-7xl mx-auto px-6 py-12 space-y-12 flex-grow w-full font-mono text-xs">
+      <!-- Grid de Métricas Globais HUD -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Faturamento Bruto Geral</div>
+          <div class="text-3xl font-bold text-white mt-2">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adminStats.totalRevenueGlobal)}
+          </div>
+          <div class="text-[9px] text-zinc-600 uppercase mt-2">Volume transacionado no Asaas</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
         </div>
 
-        <div class="flex items-center justify-between text-[10px] font-mono border-t border-zinc-800/60 pt-4">
-          <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-            <span class="text-zinc-400">Pagas: {confirmedRegistrationsCount}</span>
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Comissões da Plataforma</div>
+          <div class="text-3xl font-bold text-emerald-400 mt-2">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adminStats.totalCommissionsGlobal)}
           </div>
-          <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 bg-zinc-800 rounded-full"></span>
-            <span class="text-zinc-500">Restantes: {Math.max(0, totalSlotsGlobal - confirmedRegistrationsCount)}</span>
+          <div class="text-[9px] text-emerald-600 uppercase mt-2">Lucro retido pelas taxas</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Inscrições Globais</div>
+          <div class="text-3xl font-bold text-white mt-2">
+            {adminStats.confirmedRegistrationsGlobal} <span class="text-xs text-zinc-500">/ {adminStats.totalRegistrationsGlobal}</span>
           </div>
+          <div class="text-[9px] text-zinc-600 uppercase mt-2">Inscrições pagas vs solicitadas</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Eventos Publicados</div>
+          <div class="text-3xl font-bold text-blue-400 mt-2">
+            {adminStats.activeEventsCount}
+          </div>
+          <div class="text-[9px] text-zinc-600 uppercase mt-2">Competições ativas no ar</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
         </div>
       </div>
 
-      <!-- Gráfico de Barras SVG: Faturamento por Evento (2/3 colunas) -->
-      <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px] lg:col-span-2">
-        <div class="font-mono">
-          <h3 class="text-xs font-bold text-white uppercase tracking-wider">Faturamento por Competição</h3>
-          <p class="text-zinc-500 text-[10px] uppercase mt-1">Valores expressos em moeda nacional</p>
-        </div>
-
-        <!-- Renderizador do Gráfico de Barras SVG -->
-        <div class="relative w-full h-[180px] flex items-end pt-4 font-mono">
-          {eventStats.length === 0 ? (
-            <div class="w-full text-center text-zinc-600 text-xs py-8 uppercase">Nenhum evento registrado</div>
-          ) : (
-            <div class="w-full h-full flex items-end justify-around border-b border-zinc-800 pb-2">
-              {eventStats.map((item) => {
-                const barHeight = (item.revenue / maxRevenue) * barGraphHeight;
-                return (
-                  <div class="flex flex-col items-center w-full group relative">
-                    <!-- Tooltip HUD de Valor hover -->
-                    <div class="absolute -top-8 bg-zinc-950 border border-zinc-800 text-emerald-400 px-2 py-0.5 text-[9px] rounded-sm hidden group-hover:block transition-all shadow-xl">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.revenue)}
-                    </div>
-                    
-                    <!-- Barra SVG em CSS ou Caixa Retangular -->
-                    <div
-                      style={`height: ${Math.max(4, barHeight)}px;`}
-                      class="w-12 bg-emerald-500/20 border-t-2 border-emerald-500 hover:bg-emerald-500/30 transition-all duration-300 relative"
-                    ></div>
-                    
-                    <span class="text-[8px] text-zinc-500 uppercase mt-2 max-w-[80px] truncate text-center block">
-                      {item.title.split(' ')[0]} {item.title.split(' ')[1] || ''}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+      <!-- Área de Moderação de Eventos Pendentes -->
+      <div class="space-y-6">
+        <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4 flex items-center gap-2">
+          <span>Moderação de Eventos</span>
+          {pendingEvents.length > 0 && (
+            <span class="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] px-2 py-0.5 font-mono tracking-normal animate-pulse">
+              {pendingEvents.length} Pendentes
+            </span>
           )}
-        </div>
+        </h3>
 
-        <div class="text-[9px] text-zinc-600 uppercase font-mono border-t border-zinc-800/60 pt-4">
-          * Passe o cursor do mouse sobre a coluna correspondente para visualizar o faturamento detalhado.
-        </div>
+        {pendingEvents.length === 0 ? (
+          <div class="bg-[#15171f] border border-zinc-800 p-8 text-center text-zinc-500 uppercase">
+            Nenhum evento aguardando moderação no momento.
+          </div>
+        ) : (
+          <div class="border border-zinc-800 overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+                  <th class="p-4">Evento / Competição</th>
+                  <th class="p-4">Organização (Tenant)</th>
+                  <th class="p-4">Data da Prova</th>
+                  <th class="p-4 text-center">Vagas</th>
+                  <th class="p-4 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+                {pendingEvents.map((event) => (
+                  <tr class="hover:bg-[#1a1c25] transition-colors">
+                    <td class="p-4 font-bold text-zinc-200 uppercase">{event.title}</td>
+                    <td class="p-4 text-zinc-400 uppercase">{event.tenant.name}</td>
+                    <td class="p-4 text-zinc-400">
+                      {new Date(event.date).toLocaleDateString('pt-BR')} {new Date(event.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td class="p-4 text-center text-zinc-300">{event.availableSlots}</td>
+                    <td class="p-4 text-center">
+                      <button
+                        onclick={`aprovarEvento('${event.id}')`}
+                        class="bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors cursor-pointer"
+                      >
+                        Aprovar Evento
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    </div>
 
-    <!-- Lista Detalhada de Eventos com Ocupação HUD -->
-    <div class="space-y-6">
-      <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
-        Controle de Competições
-      </h3>
+      <!-- Configuração de Tenants e Comissões -->
+      <div class="space-y-6">
+        <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
+          Parceiros / Taxas de Comissão
+        </h3>
 
-      <div class="border border-zinc-800 overflow-x-auto">
-        <table class="w-full text-left font-mono text-xs border-collapse">
-          <thead>
-            <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
-              <th class="p-4">Competição</th>
-              <th class="p-4">Data Prova</th>
-              <th class="p-4 text-center">Inscrições (Pagas/Total)</th>
-              <th class="p-4 text-center">Faturamento</th>
-              <th class="p-4">Progresso de Vagas</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
-            {eventStats.map((item) => (
-              <tr class="hover:bg-[#1a1c25] transition-colors">
-                <td class="p-4 font-bold text-zinc-200 uppercase">{item.title}</td>
-                <td class="p-4 text-zinc-400">
-                  {new Date(item.date).toLocaleDateString('pt-BR')}
-                </td>
-                <td class="p-4 text-center text-zinc-300">
-                  <span class="text-emerald-400 font-bold">{item.confirmed}</span> / {item.confirmed + item.pending}
-                </td>
-                <td class="p-4 text-center text-emerald-400 font-bold">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.revenue)}
-                </td>
-                <td class="p-4 w-64">
-                  <div class="flex items-center gap-3">
-                    <!-- Barra de progresso horizontal HUD -->
-                    <div class="flex-grow h-2 bg-zinc-950 border border-zinc-800 rounded-none overflow-hidden relative">
-                      <div
-                        style={`width: ${item.occupancy}%`}
-                        class="h-full bg-blue-500 transition-all duration-500"
-                      ></div>
-                    </div>
-                    <span class="text-[10px] text-zinc-400 w-8">{item.occupancy.toFixed(0)}%</span>
-                  </div>
-                </td>
+        <div class="border border-zinc-800 overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+                <th class="p-4">Organização (Tenant)</th>
+                <th class="p-4">ID do Tenant</th>
+                <th class="p-4 text-center">E-mail do Responsável</th>
+                <th class="p-4 text-center">Taxa de Comissão (%)</th>
+                <th class="p-4 text-center">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+              {allTenants.map((item) => (
+                <tr class="hover:bg-[#1a1c25] transition-colors">
+                  <td class="p-4 font-bold text-zinc-200 uppercase">{item.name}</td>
+                  <td class="p-4 text-zinc-500 font-mono">{item.id}</td>
+                  <td class="p-4 text-center text-zinc-400">{item.users[0]?.email || 'Não cadastrado'}</td>
+                  <td class="p-4 text-center w-48">
+                    <div class="flex items-center justify-center gap-2">
+                      <input
+                        type="number"
+                        id={`comissao-${item.id}`}
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={Number(item.commissionRate)}
+                        class="w-20 bg-[#0d0e12] border border-zinc-800 text-zinc-300 text-center px-2 py-1.5 outline-none focus:border-emerald-500 transition-colors"
+                      />
+                      <span class="text-zinc-500">%</span>
+                    </div>
+                  </td>
+                  <td class="p-4 text-center">
+                    <button
+                      onclick={`salvarComissao('${item.id}')`}
+                      class="border border-zinc-700 hover:border-emerald-500 text-zinc-400 hover:text-emerald-400 text-[10px] uppercase px-4 py-2 font-bold tracking-wider transition-colors cursor-pointer"
+                    >
+                      Salvar Taxa
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+
+    <!-- Scripts de Ação do Administrador -->
+    <script is:inline>
+      async function aprovarEvento(eventId) {
+        if (!confirm('Deseja realmente aprovar este evento para publicação?')) return;
+        
+        try {
+          const response = await fetch('/api/admin/eventos/aprovar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ eventId })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.message || 'Erro ao aprovar evento.');
+          }
+
+          alert('Evento aprovado com sucesso!');
+          window.location.reload();
+        } catch (err) {
+          alert(err.message);
+        }
+      }
+
+      async function salvarComissao(tenantId) {
+        const input = document.getElementById(`comissao-${tenantId}`);
+        const rate = parseFloat(input.value);
+
+        if (isNaN(rate) || rate < 0 || rate > 100) {
+          alert('Por favor, informe uma taxa válida entre 0 e 100.');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/admin/tenants/comissao', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ tenantId, commissionRate: rate })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.message || 'Erro ao atualizar a comissão.');
+          }
+
+          alert('Taxa de comissão atualizada com sucesso!');
+        } catch (err) {
+          alert(err.message);
+        }
+      }
+    </script>
+  )}
+
+  {isOrganizer && (
+    <!-- TELA DO ORGANIZADOR DA COMPETIÇÃO (TENANT ESPECÍFICO) -->
+    <!-- Top Title HUD -->
+    <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
+        <div>
+          <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            Painel Organizador // {tenant?.name}
+          </div>
+          <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+            Dashboard Geral
+          </h1>
+        </div>
+        <div class="flex items-center gap-4">
+          <a
+            href="/admin/eventos/novo"
+            class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-5 py-3 tracking-widest font-extrabold transition-all duration-200"
+          >
+            + Novo Evento
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Métricas Consolidadas -->
+    <section class="max-w-7xl mx-auto px-6 py-12 space-y-12 flex-grow w-full">
+      <!-- Grid de Métricas HUD -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-mono">
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Faturamento Líquido</div>
+          <div class="text-3xl font-bold text-white mt-2">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenue)}
+          </div>
+          <div class="text-[9px] text-emerald-500 uppercase mt-2">Taxa retida de {tenant?.commissionRate || 10}% inclusa</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Total de Inscrições</div>
+          <div class="text-3xl font-bold text-white mt-2">{totalRegistrationsCount}</div>
+          <div class="text-[9px] text-zinc-600 uppercase mt-2">
+            <span class="text-emerald-400 font-bold">{confirmedRegistrationsCount}</span> pagas // <span class="text-amber-500 font-bold">{pendingRegistrationsCount}</span> pendentes
+          </div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Taxa de Conversão</div>
+          <div class="text-3xl font-bold text-emerald-400 mt-2">
+            {conversionRate.toFixed(1)}%
+          </div>
+          <div class="text-[9px] text-zinc-600 uppercase mt-2">Porcentagem de inscrições pagas</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Vagas Ocupadas</div>
+          <div class="text-3xl font-bold text-blue-400 mt-2">
+            {occupancyGlobal.toFixed(1)}%
+          </div>
+          <div class="text-[9px] text-zinc-600 uppercase mt-2">
+            {confirmedRegistrationsCount} vagas preenchidas de {totalSlotsGlobal}
+          </div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        </div>
+      </div>
+
+      <!-- Gráficos Gerados em SVG (Faturamento e Ocupação) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Gráfico de Rosca SVG: Ocupação das Vagas -->
+        <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px]">
+          <div class="font-mono">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Ocupação Global de Vagas</h3>
+            <p class="text-zinc-500 text-[10px] uppercase mt-1">Status de reservas em lotes ativos</p>
+          </div>
+
+          <div class="relative flex items-center justify-center py-6">
+            <svg class="w-36 h-36 transform -rotate-90">
+              <!-- Circulo Fundo -->
+              <circle
+                cx="72"
+                cy="72"
+                r={r}
+                class="stroke-zinc-800"
+                stroke-width="12"
+                fill="transparent"
+              />
+              <!-- Circulo Preenchimento -->
+              <circle
+                cx="72"
+                cy="72"
+                r={r}
+                class="stroke-blue-500 transition-all duration-1000 ease-out"
+                stroke-width="12"
+                fill="transparent"
+                stroke-dasharray={circumference}
+                stroke-dashoffset={dashoffset}
+                stroke-linecap="square"
+              />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center font-mono">
+              <span class="text-2xl font-bold text-white">{occupancyGlobal.toFixed(0)}%</span>
+              <span class="text-[8px] text-zinc-500 uppercase tracking-wider">Vagas Preenchidas</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-[10px] font-mono border-t border-zinc-800/60 pt-4">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+              <span class="text-zinc-400">Pagas: {confirmedRegistrationsCount}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 bg-zinc-800 rounded-full"></span>
+              <span class="text-zinc-500">Restantes: {Math.max(0, totalSlotsGlobal - confirmedRegistrationsCount)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráfico de Barras SVG: Faturamento por Evento -->
+        <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px] lg:col-span-2">
+          <div class="font-mono">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Faturamento Líquido por Evento</h3>
+            <p class="text-zinc-500 text-[10px] uppercase mt-1">Valores expressos em moeda nacional</p>
+          </div>
+
+          <div class="relative w-full h-[180px] flex items-end pt-4 font-mono">
+            {eventStats.length === 0 ? (
+              <div class="w-full text-center text-zinc-600 text-xs py-8 uppercase">Nenhum evento registrado</div>
+            ) : (
+              <div class="w-full h-full flex items-end justify-around border-b border-zinc-800 pb-2">
+                {eventStats.map((item) => {
+                  const barHeight = (item.revenue / maxRevenue) * barGraphHeight;
+                  return (
+                    <div class="flex flex-col items-center w-full group relative">
+                      <div class="absolute -top-8 bg-zinc-950 border border-zinc-800 text-emerald-400 px-2 py-0.5 text-[9px] rounded-sm hidden group-hover:block transition-all shadow-xl">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.revenue)}
+                      </div>
+                      
+                      <div
+                        style={`height: ${Math.max(4, barHeight)}px;`}
+                        class="w-12 bg-emerald-500/20 border-t-2 border-emerald-500 hover:bg-emerald-500/30 transition-all duration-300 relative"
+                      ></div>
+                      
+                      <span class="text-[8px] text-zinc-500 uppercase mt-2 max-w-[80px] truncate text-center block font-semibold">
+                        {item.title.split(' ')[0]} {item.title.split(' ')[1] || ''}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div class="text-[9px] text-zinc-600 uppercase font-mono border-t border-zinc-800/60 pt-4">
+            * Passe o cursor do mouse sobre a coluna correspondente para visualizar o faturamento líquido.
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista Detalhada de Eventos com Ocupação HUD -->
+      <div class="space-y-6">
+        <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
+          Controle de Competições
+        </h3>
+
+        <div class="border border-zinc-800 overflow-x-auto">
+          <table class="w-full text-left font-mono text-xs border-collapse">
+            <thead>
+              <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+                <th class="p-4">Competição</th>
+                <th class="p-4">Status</th>
+                <th class="p-4">Data Prova</th>
+                <th class="p-4 text-center">Inscrições (Pagas/Total)</th>
+                <th class="p-4 text-center">Faturamento Líquido</th>
+                <th class="p-4">Progresso de Vagas</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+              {eventStats.map((item) => (
+                <tr class="hover:bg-[#1a1c25] transition-colors">
+                  <td class="p-4 font-bold text-zinc-200 uppercase">{item.title}</td>
+                  <td class="p-4">
+                    {item.status === 'DRAFT' ? (
+                      <span class="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[9px] uppercase px-2 py-0.5 font-bold tracking-wider">
+                        Aguardando Aprovação
+                      </span>
+                    ) : (
+                      <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] uppercase px-2 py-0.5 font-bold tracking-wider">
+                        Publicado
+                      </span>
+                    )}
+                  </td>
+                  <td class="p-4 text-zinc-400 font-medium">
+                    {new Date(item.date).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td class="p-4 text-center text-zinc-300">
+                    <span class="text-emerald-400 font-bold">{item.confirmed}</span> / {item.confirmed + item.pending}
+                  </td>
+                  <td class="p-4 text-center text-emerald-400 font-bold">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.revenue)}
+                  </td>
+                  <td class="p-4 w-64">
+                    <div class="flex items-center gap-3">
+                      <div class="flex-grow h-2 bg-zinc-950 border border-zinc-800 rounded-none overflow-hidden relative">
+                        <div
+                          style={`width: ${item.occupancy}%`}
+                          class="h-full bg-blue-500 transition-all duration-500"
+                        ></div>
+                      </div>
+                      <span class="text-[10px] text-zinc-400 w-8">{item.occupancy.toFixed(0)}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )}
+
 </BaseLayout>

@@ -15,25 +15,25 @@ export async function processPayment(job: Job<PaymentJobData>): Promise<void> {
     customerEmail,
     customerName,
     customerCpf,
+    creditCard,
+    creditCardHolderInfo,
   } = job.data;
 
-  // 1. Busca a chave de API do Asaas do Tenant
+  // 1. Busca o Tenant no banco apenas para validar que ele existe
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
   });
 
-  if (!tenant || !tenant.asaasApiKey) {
-    throw new Error(`Asaas API Key not configured for tenant ${tenantId}`);
+  if (!tenant) {
+    throw new Error(`Tenant ${tenantId} not found`);
   }
-
-  const apiKey = tenant.asaasApiKey;
 
   // 2. Cria o cliente no Asaas
   const asaasCustomerId = await asaasService.createCustomer({
     name: customerName,
     email: customerEmail,
     cpfCnpj: customerCpf || '',
-  }, apiKey);
+  });
 
   // Data de vencimento da fatura (1 dia no futuro)
   const dueDateObj = new Date();
@@ -48,11 +48,13 @@ export async function processPayment(job: Job<PaymentJobData>): Promise<void> {
     value: amount,
     dueDate,
     externalReference: registrationId,
-  }, apiKey);
+    creditCard,
+    creditCardHolderInfo,
+  });
 
   // 4. Fluxo específico de PIX (busca copia e cola do QRCode)
   if (method === 'PIX') {
-    const pixDetails = await asaasService.getPixQrCode(asaasPayment.id, apiKey);
+    const pixDetails = await asaasService.getPixQrCode(asaasPayment.id);
 
     // Salva detalhes do PIX no banco
     await prisma.payment.upsert({
@@ -60,7 +62,7 @@ export async function processPayment(job: Job<PaymentJobData>): Promise<void> {
       create: {
         tenantId,
         registrationId,
-        asaasPaymentId: asaasPayment.id,
+        gatewayPaymentId: asaasPayment.id,
         amount,
         status: 'PENDING',
         method: 'PIX',
@@ -68,7 +70,7 @@ export async function processPayment(job: Job<PaymentJobData>): Promise<void> {
         pixExpiration: pixDetails.expirationDate ? new Date(pixDetails.expirationDate) : null,
       },
       update: {
-        asaasPaymentId: asaasPayment.id,
+        gatewayPaymentId: asaasPayment.id,
         status: 'PENDING',
         pixQrCode: pixDetails.payload,
         pixExpiration: pixDetails.expirationDate ? new Date(pixDetails.expirationDate) : null,
@@ -92,20 +94,51 @@ export async function processPayment(job: Job<PaymentJobData>): Promise<void> {
 
   } else {
     // 5. Fluxo específico de Cartão de Crédito
+    let status = 'PENDING';
+    if (asaasPayment.status === 'CONFIRMED' || asaasPayment.status === 'RECEIVED') {
+      status = 'PAID';
+    }
+
     await prisma.payment.upsert({
       where: { registrationId },
       create: {
         tenantId,
         registrationId,
-        asaasPaymentId: asaasPayment.id,
+        gatewayPaymentId: asaasPayment.id,
         amount,
-        status: 'PENDING',
+        status,
         method: 'CREDIT_CARD',
       },
       update: {
-        asaasPaymentId: asaasPayment.id,
-        status: 'PENDING',
+        gatewayPaymentId: asaasPayment.id,
+        status,
       },
     });
+
+    if (status === 'PAID') {
+      // Confirma inscrição imediatamente se o pagamento de cartão foi aprovado
+      await prisma.registration.update({
+        where: { id: registrationId },
+        data: {
+          paymentStatus: 'PAID',
+          amountPaid: amount,
+          status: 'CONFIRMED',
+        },
+      });
+
+      const emailQueue = getQueue(QueueName.EMAIL);
+      const emailJobData: EmailJobData = {
+        to: customerEmail,
+        subject: 'Sua inscrição foi confirmada!',
+        templateId: 'PAYMENT_CONFIRMED',
+        tenantId,
+        variables: {
+          userName: customerName,
+          eventName: 'Evento',
+          amount: amount.toFixed(2),
+        },
+      };
+      await emailQueue.add('send-email', emailJobData);
+    }
   }
 }

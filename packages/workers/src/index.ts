@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import { QueueName } from '@syncflow/shared';
 import { redisConnection } from './config/redis';
+import { getQueue } from './config/queues';
 import { processRegistration } from './processors/registration.processor';
 import { processPayment } from './processors/payment.processor';
 import { processWebhook } from './processors/webhook.processor';
@@ -10,6 +11,19 @@ const workers: Worker[] = [];
 
 async function bootstrap(): Promise<void> {
   console.log('🚀 SyncFlow Workers starting...');
+
+  // Configura repeatable job para varredura de expiração (rodando a cada 2 minutos)
+  const registrationQueue = getQueue(QueueName.REGISTRATION);
+  await registrationQueue.add(
+    'cleanup-expired-registrations',
+    {},
+    {
+      repeat: {
+        pattern: '*/2 * * * *',
+      },
+    }
+  );
+  console.log('⏰ Scheduled repeatable job: cleanup-expired-registrations (every 2 minutes)');
 
   // Instancia cada um dos 4 Workers associados às filas do BullMQ
   const registrationWorker = new Worker(QueueName.REGISTRATION, processRegistration, {

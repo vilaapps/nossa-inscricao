@@ -21,7 +21,7 @@ const user = await prisma.user.findUnique({
 await prisma.$disconnect();
 
 if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
-  return Astro.redirect('/'); // Redireciona nao autorizados
+  return Astro.redirect('/admin/dashboard'); // Redireciona para o dashboard/onboarding
 }
 ---
 

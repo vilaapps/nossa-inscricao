@@ -45,6 +45,93 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
   const [submissionError, setSubmissionError] = useState('');
   const [registrationId, setRegistrationId] = useState('');
 
+  // Métodos de Pagamento e Cartão
+  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardHolderName, setCardHolderName] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCcv, setCardCcv] = useState('');
+  const [sameAsParticipant, setSameAsParticipant] = useState(true);
+  const [cardHolderCpf, setCardHolderCpf] = useState('');
+  const [cardHolderZipCode, setCardHolderZipCode] = useState('');
+
+  // Máscaras de entrada
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\D/g, '').substring(0, 16);
+    const matches = v.match(/\d{4,16}/g);
+    const match = (matches && matches[0]) || '';
+    const parts = [];
+
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+
+    if (parts.length > 0) {
+      return parts.join(' ');
+    } else {
+      return v;
+    }
+  };
+
+  const formatExpiry = (value: string) => {
+    const v = value.replace(/\D/g, '').substring(0, 4);
+    if (v.length >= 2) {
+      return `${v.substring(0, 2)}/${v.substring(2)}`;
+    }
+    return v;
+  };
+
+  const formatZipCode = (value: string) => {
+    const v = value.replace(/\D/g, '').substring(0, 8);
+    if (v.length >= 5) {
+      return `${v.substring(0, 5)}-${v.substring(5)}`;
+    }
+    return v;
+  };
+
+  // Algoritmo de Luhn para validação de cartão de crédito
+  const validateLuhn = (numberStr: string): boolean => {
+    const digits = numberStr.replace(/\D/g, '');
+    
+    // Exceções para testes locais e desenvolvimento no Sandbox do Asaas
+    const localTestCards = [
+      '4444444444444444', // Cartão válido para simulação de sucesso
+      '5184019740373151', // Cartão Mastercard para simulação de erro
+      '4916561358240741'  // Cartão Visa para simulação de erro
+    ];
+    if (localTestCards.includes(digits)) {
+      return true;
+    }
+
+    if (!digits || digits.length < 13 || digits.length > 19) return false;
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let digit = parseInt(digits.charAt(i), 10);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
+  };
+
+  const validateCardExpiry = (expiry: string): boolean => {
+    const parts = expiry.split('/');
+    if (parts.length !== 2) return false;
+    const month = parseInt(parts[0], 10);
+    const year = parseInt(parts[1], 10);
+    if (isNaN(month) || isNaN(year) || month < 1 || month > 12) return false;
+    
+    const currentYear = new Date().getFullYear() % 100;
+    const currentMonth = new Date().getMonth() + 1;
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+    return true;
+  };
+
   // Passo 4: Pagamento PIX e Polling
   const [paymentStatus, setPaymentStatus] = useState('PENDING');
   const [pixQrCode, setPixQrCode] = useState('');
@@ -101,16 +188,51 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
     }
   };
 
-  // Submeter a Inscricao para a API NestJS
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmissionError('');
 
     try {
+      // Validações do Cartão de Crédito
+      if (paymentMethod === 'CREDIT_CARD') {
+        if (!cardHolderName.trim()) {
+          throw new Error('O nome impresso no cartão é obrigatório.');
+        }
+        
+        const cleanCardNumber = cardNumber.replace(/\D/g, '');
+        if (!cleanCardNumber || cleanCardNumber.length < 13 || cleanCardNumber.length > 19) {
+          throw new Error('Número do cartão de crédito inválido.');
+        }
+        if (!validateLuhn(cleanCardNumber)) {
+          throw new Error('Número do cartão de crédito inválido (Algoritmo de Luhn).');
+        }
+
+        if (!validateCardExpiry(cardExpiry)) {
+          throw new Error('Data de validade do cartão inválida ou expirada. Use o formato MM/AA.');
+        }
+
+        const cleanCcv = cardCcv.replace(/\D/g, '');
+        if (!cleanCcv || cleanCcv.length < 3 || cleanCcv.length > 4) {
+          throw new Error('Código de segurança (CVV) inválido.');
+        }
+
+        const cleanZipCode = cardHolderZipCode.replace(/\D/g, '');
+        if (!cleanZipCode || cleanZipCode.length !== 8) {
+          throw new Error('CEP do titular inválido.');
+        }
+
+        if (!sameAsParticipant) {
+          const cleanCpf = cardHolderCpf.replace(/\D/g, '');
+          if (!cleanCpf || cleanCpf.length !== 11) {
+            throw new Error('CPF do titular inválido.');
+          }
+        }
+      }
+
       const token = await getClerkToken();
       
-      const payload = {
+      const payload: any = {
         eventId,
         categoryId: selectedCategoryId,
         batchId: activeBatch?.id,
@@ -120,9 +242,23 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
           phone,
           shirtSize,
         },
+        paymentMethod,
       };
 
-      const response = await fetch('http://localhost:3001/registrations', {
+      if (paymentMethod === 'CREDIT_CARD') {
+        const parts = cardExpiry.split('/');
+        payload.cardDetails = {
+          holderName: cardHolderName.trim().toUpperCase(),
+          number: cardNumber.replace(/\D/g, ''),
+          expiryMonth: parts[0],
+          expiryYear: `20${parts[1]}`, // assume 20XX
+          ccv: cardCcv.replace(/\D/g, ''),
+          holderCpf: sameAsParticipant ? cpf.replace(/\D/g, '') : cardHolderCpf.replace(/\D/g, ''),
+          holderZipCode: cardHolderZipCode.replace(/\D/g, ''),
+        };
+      }
+
+      const response = await fetch('http://localhost:3001/api/registrations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,7 +294,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
     const pollStatus = async () => {
       try {
         const token = await getClerkToken();
-        const response = await fetch(`http://localhost:3001/registrations/${registrationId}`, {
+        const response = await fetch(`http://localhost:3001/api/registrations/${registrationId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -412,13 +548,141 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
             {couponSuccess && <p class="text-[10px] text-emerald-400 uppercase">{couponSuccess}</p>}
           </div>
 
+          {/* Método de Pagamento */}
+          <div class="border border-zinc-800 p-4 space-y-4 font-mono">
+            <label class="text-[10px] uppercase text-zinc-400 block tracking-wider">Forma de Pagamento</label>
+            <div class="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('PIX')}
+                class={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${
+                  paymentMethod === 'PIX'
+                    ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
+                    : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <span class="text-xs font-bold uppercase tracking-wide">PIX</span>
+                <span class="text-[9px] text-zinc-500 mt-1">Confirmação em instantes</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('CREDIT_CARD')}
+                class={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${
+                  paymentMethod === 'CREDIT_CARD'
+                    ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
+                    : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <span class="text-xs font-bold uppercase tracking-wide">Cartão de Crédito</span>
+                <span class="text-[9px] text-zinc-500 mt-1">Aprovação imediata</span>
+              </button>
+            </div>
+
+            {paymentMethod === 'CREDIT_CARD' && (
+              <div class="space-y-4 pt-4 border-t border-zinc-800/60 text-xs">
+                {/* Número do Cartão */}
+                <div class="space-y-1">
+                  <label htmlFor="cardNumber" class="text-[9px] uppercase text-zinc-400 block tracking-wider">Número do Cartão</label>
+                  <input
+                    type="text"
+                    id="cardNumber"
+                    placeholder="0000 0000 0000 0000"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                    class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                  />
+                </div>
+
+                {/* Nome no Cartão */}
+                <div class="space-y-1">
+                  <label htmlFor="cardHolderName" class="text-[9px] uppercase text-zinc-400 block tracking-wider">Nome Impresso no Cartão</label>
+                  <input
+                    type="text"
+                    id="cardHolderName"
+                    placeholder="JOÃO S SILVA"
+                    value={cardHolderName}
+                    onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
+                    class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  {/* Validade */}
+                  <div class="space-y-1">
+                    <label htmlFor="cardExpiry" class="text-[9px] uppercase text-zinc-400 block tracking-wider">Validade (MM/AA)</label>
+                    <input
+                      type="text"
+                      id="cardExpiry"
+                      placeholder="MM/AA"
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                      class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                    />
+                  </div>
+
+                  {/* CVV */}
+                  <div class="space-y-1">
+                    <label htmlFor="cardCcv" class="text-[9px] uppercase text-zinc-400 block tracking-wider">CVV</label>
+                    <input
+                      type="text"
+                      id="cardCcv"
+                      placeholder="123"
+                      value={cardCcv}
+                      onChange={(e) => setCardCcv(e.target.value.replace(/\D/g, '').substring(0, 4))}
+                      class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Checkbox Mesmos Dados do Participante */}
+                <label class="flex gap-2 items-center select-none cursor-pointer font-sans text-[10px] text-zinc-400">
+                  <input
+                    type="checkbox"
+                    checked={sameAsParticipant}
+                    onChange={(e) => setSameAsParticipant(e.target.checked)}
+                    class="accent-emerald-500 w-3 h-3 bg-zinc-950 border-zinc-800"
+                  />
+                  <span>Os dados cadastrais do titular são os mesmos do participante</span>
+                </label>
+
+                {/* Se não for o mesmo participante, exibir CPF do Titular */}
+                {!sameAsParticipant && (
+                  <div class="space-y-1">
+                    <label htmlFor="cardHolderCpf" class="text-[9px] uppercase text-zinc-400 block tracking-wider">CPF do Titular do Cartão</label>
+                    <input
+                      type="text"
+                      id="cardHolderCpf"
+                      placeholder="000.000.000-00"
+                      value={cardHolderCpf}
+                      onChange={(e) => setCardHolderCpf(formatCpf(e.target.value))}
+                      class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* CEP do Titular (sempre obrigatório para validação cadastral) */}
+                <div class="space-y-1">
+                  <label htmlFor="cardHolderZipCode" class="text-[9px] uppercase text-zinc-400 block tracking-wider">CEP do Titular</label>
+                  <input
+                    type="text"
+                    id="cardHolderZipCode"
+                    placeholder="00000-000"
+                    value={cardHolderZipCode}
+                    onChange={(e) => setCardHolderZipCode(formatZipCode(e.target.value))}
+                    class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <label class="flex gap-3 items-start select-none cursor-pointer font-sans text-[11px] text-zinc-500 leading-tight">
             <input
               type="checkbox"
               required
               class="accent-emerald-500 w-3.5 h-3.5 mt-0.5 bg-zinc-950 border-zinc-800"
             />
-            <span>Declaro que aceito as regras oficiais da competição e concordo em prosseguir com o pagamento PIX no valor de {formatPrice(finalPrice)}.</span>
+            <span>Declaro que aceito as regras oficiais da competição e concordo em prosseguir com o pagamento no valor de {formatPrice(finalPrice)} via {paymentMethod === 'PIX' ? 'PIX' : 'Cartão de Crédito'}.</span>
           </label>
 
           <div class="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
@@ -434,59 +698,78 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               disabled={isSubmitting}
               class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? 'PROCESSANDO INSCRIÇÃO...' : 'FINALIZAR INSCRIÇÃO & GERAR PIX'}
+              {isSubmitting ? 'PROCESSANDO INSCRIÇÃO...' : paymentMethod === 'PIX' ? 'FINALIZAR INSCRIÇÃO & GERAR PIX' : 'FINALIZAR INSCRIÇÃO & PAGAR COM CARTÃO'}
             </button>
           </div>
         </form>
       )}
 
-      {/* ETAPA 4: PAGAMENTO PIX & POLLING */}
+      {/* ETAPA 4: PAGAMENTO & POLLING */}
       {step === 4 && (
         <div class="space-y-8 text-center font-mono">
           {paymentStatus === 'PENDING' && (
             <div class="space-y-6">
               <div>
-                <h2 class="font-heading text-xl font-bold text-white uppercase tracking-wider">Inscrição Reservada com Sucesso!</h2>
-                <p class="text-zinc-500 text-xs mt-1">Sua vaga está garantida por tempo limitado. Realize o pagamento do PIX abaixo.</p>
+                <h2 class="font-heading text-xl font-bold text-white uppercase tracking-wider">
+                  {paymentMethod === 'PIX' ? 'Inscrição Reservada com Sucesso!' : 'Processando Cobrança...'}
+                </h2>
+                <p class="text-zinc-500 text-xs mt-1">
+                  {paymentMethod === 'PIX' 
+                    ? 'Sua vaga está garantida por tempo limitado. Realize o pagamento do PIX abaixo.'
+                    : 'Estamos validando e processando a transação do cartão de crédito no gateway.'
+                  }
+                </p>
               </div>
 
-              {/* QR Code Container */}
-              <div class="max-w-[200px] mx-auto bg-white p-3 aspect-square flex items-center justify-center border border-zinc-800">
-                {pixQrCode ? (
-                  // Usando uma imagem publica para gerar QR Code do valor copia e cola
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixQrCode)}`}
-                    alt="QR Code PIX para pagamento"
-                    class="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div class="text-zinc-400 text-[10px] uppercase flex flex-col items-center gap-2">
-                    <span class="w-5 h-5 border-2 border-zinc-400 border-t-transparent animate-spin rounded-full"></span>
-                    Gerando QR Code...
-                  </div>
-                )}
-              </div>
-
-              {/* Pix Copia e Cola */}
-              {pixQrCode && (
-                <div class="space-y-2 text-left max-w-md mx-auto">
-                  <label htmlFor="pixCode" class="text-[10px] uppercase text-zinc-500 block tracking-wider">PIX Copia e Cola</label>
-                  <div class="flex">
-                    <input
-                      type="text"
-                      id="pixCode"
-                      readOnly
-                      value={pixQrCode}
-                      class="bg-[#0d0e12] border border-zinc-800 text-zinc-400 text-xs px-3 py-2.5 outline-none flex-grow font-mono truncate"
-                    />
-                    <button
-                      onClick={handleCopyPix}
-                      class="bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs px-4 py-2 hover:text-white transition-all cursor-pointer"
-                    >
-                      {copySuccess ? 'COPIADO!' : 'COPIAR'}
-                    </button>
-                  </div>
+              {paymentMethod === 'CREDIT_CARD' ? (
+                <div class="py-8 space-y-4 max-w-sm mx-auto border border-zinc-800 bg-[#0d0e12] p-6">
+                  <div class="w-10 h-10 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full mx-auto"></div>
+                  <div class="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Aguardando autorização...</div>
+                  <p class="text-[9px] text-zinc-500 leading-relaxed uppercase">
+                    Por favor, não feche ou recarregue esta página. Isso pode levar alguns segundos.
+                  </p>
                 </div>
+              ) : (
+                <>
+                  {/* QR Code Container */}
+                  <div class="max-w-[200px] mx-auto bg-white p-3 aspect-square flex items-center justify-center border border-zinc-800">
+                    {pixQrCode ? (
+                      // Usando uma imagem publica para gerar QR Code do valor copia e cola
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixQrCode)}`}
+                        alt="QR Code PIX para pagamento"
+                        class="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div class="text-zinc-400 text-[10px] uppercase flex flex-col items-center gap-2">
+                        <span class="w-5 h-5 border-2 border-zinc-400 border-t-transparent animate-spin rounded-full"></span>
+                        Gerando QR Code...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pix Copia e Cola */}
+                  {pixQrCode && (
+                    <div class="space-y-2 text-left max-w-md mx-auto">
+                      <label htmlFor="pixCode" class="text-[10px] uppercase text-zinc-500 block tracking-wider">PIX Copia e Cola</label>
+                      <div class="flex">
+                        <input
+                          type="text"
+                          id="pixCode"
+                          readOnly
+                          value={pixQrCode}
+                          class="bg-[#0d0e12] border border-zinc-800 text-zinc-400 text-xs px-3 py-2.5 outline-none flex-grow font-mono truncate"
+                        />
+                        <button
+                          onClick={handleCopyPix}
+                          class="bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs px-4 py-2 hover:text-white transition-all cursor-pointer"
+                        >
+                          {copySuccess ? 'COPIADO!' : 'COPIAR'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Loading Status */}
@@ -510,14 +793,14 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               <div>
                 <h2 class="font-heading text-2xl font-bold text-white uppercase tracking-wider">Inscrição Confirmada!</h2>
                 <p class="text-zinc-400 text-xs mt-2 max-w-sm mx-auto leading-relaxed">
-                  Seu pagamento foi aprovado pelo gateway Asaas. Sua vaga está garantida e o kit (tamanho {shirtSize}) foi reservado.
+                  Seu pagamento foi aprovado pelo gateway de pagamento. Sua vaga está garantida e o kit (tamanho {shirtSize}) foi reservado.
                 </p>
               </div>
 
               <div class="bg-[#0d0e12] border border-zinc-800/80 p-4 text-xs max-w-sm w-full text-left space-y-2">
                 <div class="flex justify-between text-zinc-500"><span class="uppercase">Inscrição ID</span><span class="text-zinc-300 font-bold">{registrationId.substring(0, 13)}...</span></div>
                 <div class="flex justify-between text-zinc-500"><span class="uppercase">Valor Pago</span><span class="text-emerald-400 font-bold">{formatPrice(amount || finalPrice)}</span></div>
-                <div class="flex justify-between text-zinc-500"><span class="uppercase">Status</span><span class="text-emerald-400 font-bold uppercase">Aprovado (PIX)</span></div>
+                <div class="flex justify-between text-zinc-500"><span class="uppercase">Status</span><span class="text-emerald-400 font-bold uppercase">Aprovado ({paymentMethod === 'PIX' ? 'PIX' : 'Cartão'})</span></div>
               </div>
 
               <div class="pt-4">
@@ -538,16 +821,21 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               </div>
 
               <div>
-                <h2 class="font-heading text-2xl font-bold text-white uppercase tracking-wider">Tempo Esgotado!</h2>
-                <p class="text-red-400 text-xs mt-2 max-w-sm mx-auto leading-relaxed">
-                  O tempo limite para pagamento do PIX desta vaga expirou ou a inscrição foi cancelada pelo sistema.
+                <h2 class="font-heading text-2xl font-bold text-white uppercase tracking-wider">
+                  {paymentMethod === 'PIX' ? 'Tempo Esgotado!' : 'Pagamento Recusado'}
+                </h2>
+                <p class="text-red-400 text-xs mt-2 max-w-sm mx-auto leading-relaxed font-sans">
+                  {paymentMethod === 'PIX' 
+                    ? 'O tempo limite para pagamento do PIX desta vaga expirou ou a inscrição foi cancelada pelo sistema.'
+                    : 'A transação com o seu cartão de crédito foi recusada pelo gateway de pagamento. Verifique os dados ou tente outra forma de pagamento.'
+                  }
                 </p>
               </div>
 
               <div class="pt-4">
                 <button
                   onClick={() => setStep(3)}
-                  class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs uppercase px-8 py-3.5 tracking-widest font-bold transition-all duration-200 inline-block cursor-pointer"
+                  class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs uppercase px-8 py-3.5 tracking-widest font-bold transition-all duration-200 inline-block cursor-pointer border border-zinc-700"
                 >
                   Tentar Novamente
                 </button>

@@ -19,6 +19,21 @@ export interface PaymentJobData {
   customerEmail: string;
   customerName: string;
   customerCpf: string;
+  creditCard?: {
+    holderName: string;
+    number: string;
+    expiryMonth: string;
+    expiryYear: string;
+    ccv: string;
+  };
+  creditCardHolderInfo?: {
+    name: string;
+    email: string;
+    cpfCnpj: string;
+    postalCode: string;
+    phone: string;
+    addressNumber?: string;
+  };
 }
 
 export interface WebhookJobData {

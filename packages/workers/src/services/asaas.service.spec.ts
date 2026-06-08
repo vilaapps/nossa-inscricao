@@ -35,6 +35,15 @@ describe('AsaasService', () => {
     expect((service as any).globalApiKey).toBe('');
   });
 
+  // deve limpar cifrão extra se chave iniciar com cifrão duplo ($$)
+  it('should clean duplicate dollar signs if API key starts with $$', () => {
+    // Arrange
+    const service = new AsaasService('$$aact_test_key', false);
+
+    // Act & Assert
+    expect((service as any).globalApiKey).toBe('$aact_test_key');
+  });
+
   // deve lancar erro se nenhuma chave de API for fornecida
   it('should throw an error if no API key is defined anywhere', async () => {
     // Arrange
@@ -70,7 +79,7 @@ describe('AsaasService', () => {
     // Assert
     expect(customerId).toBe('cus_12345');
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://sandbox.asaas.com/v3/customers',
+      'https://api-sandbox.asaas.com/v3/customers',
       expect.objectContaining({
         method: 'POST',
         headers: {
@@ -153,7 +162,7 @@ describe('AsaasService', () => {
     // Assert
     expect(response).toEqual(mockPaymentResponse);
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://sandbox.asaas.com/v3/payments',
+      'https://api-sandbox.asaas.com/v3/payments',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
@@ -267,7 +276,7 @@ describe('AsaasService', () => {
     // Assert
     expect(response).toEqual(mockPixDetails);
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://sandbox.asaas.com/v3/payments/pay_123/pixQrCode',
+      'https://api-sandbox.asaas.com/v3/payments/pay_123/pixQrCode',
       expect.any(Object)
     );
   });
@@ -287,5 +296,45 @@ describe('AsaasService', () => {
     await expect(
       service.getPixQrCode('pay_invalid')
     ).rejects.toThrow('Failed to retrieve Asaas PIX details: Not Found - Payment not found');
+  });
+
+  // deve excluir um pagamento com sucesso
+  it('should delete a payment successfully', async () => {
+    // Arrange
+    const service = new AsaasService();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+    } as Response);
+
+    // Act
+    await service.deletePayment('pay_123');
+
+    // Assert
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api-sandbox.asaas.com/v3/payments/pay_123',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': 'test-global-key',
+        },
+      })
+    );
+  });
+
+  // deve lancar erro ao falhar na exclusao do pagamento
+  it('should throw an error when payment deletion fails', async () => {
+    // Arrange
+    const service = new AsaasService();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      statusText: 'Bad Request',
+      text: async () => 'Payment cannot be deleted',
+    } as Response);
+
+    // Act & Assert
+    await expect(
+      service.deletePayment('pay_123')
+    ).rejects.toThrow('Failed to delete Asaas payment: Bad Request - Payment cannot be deleted');
   });
 });

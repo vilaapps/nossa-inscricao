@@ -1,5 +1,6 @@
 ---
 import { UserButton, SignInButton } from '@clerk/astro/components';
+import { PrismaClient } from '@prisma/client';
 
 interface Props {
   title: string;
@@ -17,6 +18,20 @@ const {
 const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'http://localhost:4321');
 
 const { userId } = Astro.locals.auth();
+
+let userRole = 'PARTICIPANT';
+
+if (userId) {
+  const prisma = new PrismaClient();
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (dbUser) {
+    userRole = dbUser.role;
+  }
+  await prisma.$disconnect();
+}
 ---
 
 <!doctype html>
@@ -54,11 +69,31 @@ const { userId } = Astro.locals.auth();
         <!-- Navigation Links -->
         <nav class="hidden md:flex items-center space-x-8 text-sm font-medium tracking-wide">
           <a href="/" class="text-zinc-400 hover:text-white transition-colors duration-200">Eventos</a>
-          <a href="/painel" class="text-zinc-400 hover:text-white transition-colors duration-200">Minhas Inscrições</a>
-          <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
-            <span class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-            Painel Admin
-          </a>
+          {userId && <a href="/painel" class="text-zinc-400 hover:text-white transition-colors duration-200">Minhas Inscrições</a>}
+          
+          {userId ? (
+            userRole === 'PARTICIPANT' ? (
+              <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                Traga seu evento
+              </a>
+            ) : userRole === 'ADMIN' ? (
+              <a href="/admin/dashboard" class="text-emerald-400 hover:text-emerald-300 transition-colors duration-200 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                Painel Geral
+              </a>
+            ) : (
+              <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                Painel Organizador
+              </a>
+            )
+          ) : (
+            <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+              <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+              Traga seu evento
+            </a>
+          )}
         </nav>
 
         <!-- Clerk Auth Actions -->

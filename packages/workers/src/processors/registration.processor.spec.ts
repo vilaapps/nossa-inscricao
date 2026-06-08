@@ -290,7 +290,16 @@ describe('Registration Processor', () => {
     const mockReg = {
       id: 'reg_1',
       status: 'QUEUED',
-      metadata: { paymentMethod: 'CREDIT_CARD', cpf: '99999999999' },
+      metadata: {
+        paymentMethod: 'CREDIT_CARD',
+        cardDetails: {
+          holderName: 'Zezinho Card',
+          number: '1234123412341234',
+          expiryMonth: '10',
+          expiryYear: '2030',
+          ccv: '999',
+        },
+      },
       user: { email: 'participant@test.com', name: 'Zezinho' },
     };
 
@@ -315,11 +324,32 @@ describe('Registration Processor', () => {
     await processRegistration(job);
 
     // Assert
-    expect(mockQueue.add).toHaveBeenCalledWith('process-payment', expect.objectContaining({
+    expect(mockQueue.add).toHaveBeenCalledWith('process-payment', {
+      registrationId: 'reg_1',
+      orderId: 'reg_1',
+      userId: 'usr_1',
+      tenantId: 'ten_1',
+      amount: 80.00,
       method: 'CREDIT_CARD',
+      customerEmail: 'participant@test.com',
       customerName: 'Zezinho',
-      customerCpf: '99999999999',
-    }));
+      customerCpf: '',
+      creditCard: {
+        holderName: 'Zezinho Card',
+        number: '1234123412341234',
+        expiryMonth: '10',
+        expiryYear: '2030',
+        ccv: '999',
+      },
+      creditCardHolderInfo: {
+        name: 'Zezinho Card',
+        email: 'participant@test.com',
+        cpfCnpj: '',
+        postalCode: '',
+        phone: '21999999999',
+        addressNumber: 'S/N',
+      },
+    });
   });
 
   // deve aplicar desconto de porcentagem do cupom se for valido

@@ -82,7 +82,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         description: description || '',
         date: new Date(date),
         availableSlots: Number(availableSlots),
-        status: 'PUBLISHED',
+        status: 'DRAFT',
         tenantId,
         categories: {
           create: categories.map((cat: any) => ({

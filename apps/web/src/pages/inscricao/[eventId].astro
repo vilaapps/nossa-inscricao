@@ -27,6 +27,14 @@ await prisma.$disconnect();
 if (!event) {
   return Astro.redirect('/404');
 }
+
+// Serializar explicitamente os lotes para evitar que o tipo Decimal do Prisma quebre na serialização Astro/React
+const serializedBatches = event.batches.map(batch => ({
+  id: batch.id,
+  name: batch.name,
+  price: batch.price.toString(),
+  active: batch.active,
+}));
 ---
 
 <BaseLayout title={`Inscrição — ${event.title}`}>
@@ -51,7 +59,7 @@ if (!event) {
       eventId={event.id}
       eventTitle={event.title}
       categories={event.categories}
-      batches={event.batches}
+      batches={serializedBatches}
     />
   </section>
 </BaseLayout>

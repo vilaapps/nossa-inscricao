@@ -23,7 +23,7 @@ export async function processWebhook(job: Job<WebhookJobData>): Promise<void> {
 
   // Busca o pagamento no banco
   const dbPayment = await prisma.payment.findUnique({
-    where: { asaasPaymentId },
+    where: { gatewayPaymentId: asaasPaymentId },
     include: {
       registration: {
         include: {
