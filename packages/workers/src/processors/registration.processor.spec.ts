@@ -4,6 +4,7 @@ import { prisma } from '../services/prisma.service';
 import { getQueue } from '../config/queues';
 import { QueueName } from '@syncflow/shared';
 import { Job } from 'bullmq';
+import { cleanupExpiredRegistrations } from './cleanup-expired-registrations.processor';
 
 // Mock das Filas
 vi.mock('../config/queues', () => {
@@ -23,6 +24,13 @@ vi.mock('../services/prisma.service', () => {
   };
 });
 
+// Mock do Cleanup Processor
+vi.mock('./cleanup-expired-registrations.processor', () => {
+  return {
+    cleanupExpiredRegistrations: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('Registration Processor', () => {
   const mockQueue = getQueue(QueueName.PAYMENT);
 
@@ -35,6 +43,22 @@ describe('Registration Processor', () => {
       data,
     } as Job;
   };
+
+  // deve delegar para cleanupExpiredRegistrations se o nome do job for cleanup-expired-registrations
+  it('should delegate to cleanupExpiredRegistrations if job name is cleanup-expired-registrations', async () => {
+    // Arrange
+    const job = {
+      name: 'cleanup-expired-registrations',
+      data: {},
+    } as Job;
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(cleanupExpiredRegistrations).toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
 
   // deve lancar erro se o evento nao for encontrado
   it('should throw an error if the event is not found during lock', async () => {

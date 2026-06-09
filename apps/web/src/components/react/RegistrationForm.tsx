@@ -258,7 +258,8 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
         };
       }
 
-      const response = await fetch('http://localhost:3001/api/registrations', {
+      const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/registrations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -294,7 +295,8 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
     const pollStatus = async () => {
       try {
         const token = await getClerkToken();
-        const response = await fetch(`http://localhost:3001/api/registrations/${registrationId}`, {
+        const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/registrations/${registrationId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
