@@ -24,8 +24,27 @@ async function bootstrap() {
     : ['http://localhost:4321'];
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      // Habilita CORS se for local, se o origin for vazio (ex: mobile, server-to-server),
+      // se estiver na lista de permitidos, ou se for qualquer subdomínio da Vercel.
+      if (
+        !origin ||
+        process.env.NODE_ENV === 'development' ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        /\.vercel\.app$/.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   // Configuração do Swagger
