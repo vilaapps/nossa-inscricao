@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -12,11 +12,26 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    BullModule.forRoot({
-      connection: process.env.UPSTASH_REDIS_URL || {
-        host: process.env.REDIS_HOST || '127.0.0.1',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      } as any,
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('UPSTASH_REDIS_URL');
+        return {
+          connection: redisUrl
+            ? {
+                url: redisUrl,
+                maxRetriesPerRequest: null,
+                enableReadyCheck: false,
+              }
+            : {
+                host: configService.get<string>('REDIS_HOST') || '127.0.0.1',
+                port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
+                maxRetriesPerRequest: null,
+                enableReadyCheck: false,
+              },
+        };
+      },
+      inject: [ConfigService],
     }),
     PrismaModule,
     RegistrationsModule,
