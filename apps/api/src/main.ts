@@ -18,9 +18,13 @@ async function bootstrap() {
     }),
   );
 
-  // CORS habilitado
+  // CORS habilitado (suporta múltiplos domínios separados por vírgula)
+  const allowedOrigins = process.env.WEB_URL
+    ? process.env.WEB_URL.split(',').map((origin) => origin.trim())
+    : ['http://localhost:4321'];
+
   app.enableCors({
-    origin: process.env.WEB_URL ?? 'http://localhost:4321',
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -31,7 +35,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
