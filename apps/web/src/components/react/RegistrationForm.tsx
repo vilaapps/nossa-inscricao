@@ -23,7 +23,7 @@ interface RegistrationFormProps {
 
 export default function RegistrationForm({ eventId, eventTitle, categories, batches }: RegistrationFormProps) {
   const [step, setStep] = useState(1);
-  
+
   // Passo 1: Categoria e Lote
   const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id || '');
   const activeBatch = batches.find(b => b.active);
@@ -92,7 +92,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
   // Algoritmo de Luhn para validação de cartão de crédito
   const validateLuhn = (numberStr: string): boolean => {
     const digits = numberStr.replace(/\D/g, '');
-    
+
     // Exceções para testes locais e desenvolvimento no Sandbox do Asaas
     const localTestCards = [
       '4444444444444444', // Cartão válido para simulação de sucesso
@@ -124,7 +124,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
     const month = parseInt(parts[0], 10);
     const year = parseInt(parts[1], 10);
     if (isNaN(month) || isNaN(year) || month < 1 || month > 12) return false;
-    
+
     const currentYear = new Date().getFullYear() % 100;
     const currentMonth = new Date().getMonth() + 1;
     if (year < currentYear) return false;
@@ -199,7 +199,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
         if (!cardHolderName.trim()) {
           throw new Error('O nome impresso no cartão é obrigatório.');
         }
-        
+
         const cleanCardNumber = cardNumber.replace(/\D/g, '');
         if (!cleanCardNumber || cleanCardNumber.length < 13 || cleanCardNumber.length > 19) {
           throw new Error('Número do cartão de crédito inválido.');
@@ -231,7 +231,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
       }
 
       const token = await getClerkToken();
-      
+
       const payload: any = {
         eventId,
         categoryId: selectedCategoryId,
@@ -276,7 +276,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
 
       const data = await response.json();
       setRegistrationId(data.id);
-      
+
       // Inicia Passo 4 (Pagamento)
       setStep(4);
     } catch (err: any) {
@@ -305,7 +305,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
         if (!response.ok) return;
 
         const data = await response.json();
-        
+
         setPaymentStatus(data.paymentStatus);
         setAmount(Number(data.amountPaid));
 
@@ -383,9 +383,8 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
             {categories.map((cat) => (
               <label
                 key={cat.id}
-                class={`flex items-center gap-4 bg-[#0d0e12] border p-4 cursor-pointer transition-all duration-200 ${
-                  selectedCategoryId === cat.id ? 'border-emerald-500/60 bg-emerald-500/[0.02]' : 'border-zinc-800 hover:border-zinc-700'
-                }`}
+                class={`flex items-center gap-4 bg-[#0d0e12] border p-4 cursor-pointer transition-all duration-200 ${selectedCategoryId === cat.id ? 'border-emerald-500/60 bg-emerald-500/[0.02]' : 'border-zinc-800 hover:border-zinc-700'
+                  }`}
               >
                 <input
                   type="radio"
@@ -409,7 +408,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               disabled={!selectedCategoryId}
               class="bg-emerald-500 hover:bg-emerald-600 text-black font-mono text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
             >
-              Próximo Passo &rarr;
+              Próximo Passo;
             </button>
           </div>
         </div>
@@ -478,7 +477,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               disabled={!cpf.trim() || !phone.trim()}
               class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
             >
-              Próximo Passo &rarr;
+              Próximo Passo;
             </button>
           </div>
         </div>
@@ -557,11 +556,10 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               <button
                 type="button"
                 onClick={() => setPaymentMethod('PIX')}
-                class={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${
-                  paymentMethod === 'PIX'
-                    ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
-                    : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
-                }`}
+                class={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${paymentMethod === 'PIX'
+                  ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
+                  : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
+                  }`}
               >
                 <span class="text-xs font-bold uppercase tracking-wide">PIX</span>
                 <span class="text-[9px] text-zinc-500 mt-1">Confirmação em instantes</span>
@@ -569,11 +567,10 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               <button
                 type="button"
                 onClick={() => setPaymentMethod('CREDIT_CARD')}
-                class={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${
-                  paymentMethod === 'CREDIT_CARD'
-                    ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
-                    : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
-                }`}
+                class={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${paymentMethod === 'CREDIT_CARD'
+                  ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
+                  : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
+                  }`}
               >
                 <span class="text-xs font-bold uppercase tracking-wide">Cartão de Crédito</span>
                 <span class="text-[9px] text-zinc-500 mt-1">Aprovação imediata</span>
@@ -716,7 +713,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                   {paymentMethod === 'PIX' ? 'Inscrição Reservada com Sucesso!' : 'Processando Cobrança...'}
                 </h2>
                 <p class="text-zinc-500 text-xs mt-1">
-                  {paymentMethod === 'PIX' 
+                  {paymentMethod === 'PIX'
                     ? 'Sua vaga está garantida por tempo limitado. Realize o pagamento do PIX abaixo.'
                     : 'Estamos validando e processando a transação do cartão de crédito no gateway.'
                   }
@@ -827,7 +824,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                   {paymentMethod === 'PIX' ? 'Tempo Esgotado!' : 'Pagamento Recusado'}
                 </h2>
                 <p class="text-red-400 text-xs mt-2 max-w-sm mx-auto leading-relaxed font-sans">
-                  {paymentMethod === 'PIX' 
+                  {paymentMethod === 'PIX'
                     ? 'O tempo limite para pagamento do PIX desta vaga expirou ou a inscrição foi cancelada pelo sistema.'
                     : 'A transação com o seu cartão de crédito foi recusada pelo gateway de pagamento. Verifique os dados ou tente outra forma de pagamento.'
                   }

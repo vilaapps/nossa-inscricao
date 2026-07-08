@@ -54,6 +54,40 @@ export class AsaasService {
     };
   }
 
+  // Busca um cliente existente no Asaas pelo CPF/CNPJ ou Email
+  async findCustomer(cpfCnpj: string, email?: string, customApiKey?: string): Promise<string | null> {
+    const cleanCpfCnpj = cpfCnpj ? cpfCnpj.replace(/\D/g, '') : '';
+    let url = `${this.baseUrl}/customers`;
+    
+    if (cleanCpfCnpj) {
+      url += `?cpfCnpj=${cleanCpfCnpj}`;
+    } else if (email) {
+      url += `?email=${encodeURIComponent(email)}`;
+    } else {
+      return null;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(customApiKey),
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data: any = await response.json();
+      if (data && data.data && data.data.length > 0) {
+        return data.data[0].id;
+      }
+    } catch {
+      // Ignora falhas na busca e deixa seguir para criação de um novo
+    }
+
+    return null;
+  }
+
   // Cria um cliente no gateway do Asaas
   async createCustomer(input: AsaasCustomerInput, customApiKey?: string): Promise<string> {
     const response = await fetch(`${this.baseUrl}/customers`, {

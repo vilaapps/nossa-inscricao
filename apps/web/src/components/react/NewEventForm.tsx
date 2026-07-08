@@ -106,7 +106,7 @@ export default function NewEventForm() {
       }
 
       setSuccessMessage('Competição criada com sucesso! Redirecionando...');
-      
+
       setTimeout(() => {
         window.location.href = '/admin/dashboard';
       }, 1500);
@@ -122,7 +122,7 @@ export default function NewEventForm() {
       <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
 
       <div class="mb-6">
-        <h2 class="font-heading text-xl font-bold text-white uppercase tracking-wider">Nova Competição</h2>
+        <h2 class="font-heading text-xl font-bold text-white uppercase tracking-wider">Novo Evento</h2>
         <p class="text-zinc-500 text-xs mt-1 font-mono uppercase">Cadastre as informações da prova esportiva.</p>
       </div>
 
@@ -329,7 +329,7 @@ export default function NewEventForm() {
           disabled={isSubmitting}
           class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
         >
-          {isSubmitting ? 'SALVANDO EVENTO...' : 'PUBLICAR COMPETIÇÃO &rarr;'}
+          {isSubmitting ? 'SALVANDO EVENTO...' : 'PUBLICAR COMPETIÇÃO'}
         </button>
       </div>
     </form>

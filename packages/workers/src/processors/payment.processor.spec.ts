@@ -36,6 +36,7 @@ vi.mock('../services/prisma.service', () => {
 vi.mock('../services/asaas.service', () => {
   return {
     asaasService: {
+      findCustomer: vi.fn().mockResolvedValue(null),
       createCustomer: vi.fn(),
       createPayment: vi.fn(),
       getPixQrCode: vi.fn(),
@@ -319,6 +320,46 @@ describe('Payment Processor', () => {
       create: expect.objectContaining({
         status: 'PAID',
       }),
+    }));
+  });
+
+  it('should reuse an existing customer if findCustomer returns a customer ID', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_123',
+      tenantId: 'ten_1',
+      amount: 150.00,
+      method: 'PIX',
+      customerEmail: 'customer@test.com',
+      customerName: 'Astro Customer',
+      customerCpf: '12345678900',
+    });
+
+    vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
+      id: 'ten_1',
+    } as any);
+
+    // Mock findCustomer to return an existing customer ID
+    vi.mocked(asaasService.findCustomer).mockResolvedValueOnce('cus_existing_123');
+    
+    vi.mocked(asaasService.createPayment).mockResolvedValueOnce({
+      id: 'pay_asaas_123',
+      status: 'PENDING',
+    });
+
+    vi.mocked(asaasService.getPixQrCode).mockResolvedValueOnce({
+      payload: 'pix-payload',
+      expirationDate: '2026-06-09T00:00:00.000Z',
+    });
+
+    // Act
+    await processPayment(job);
+
+    // Assert
+    expect(asaasService.findCustomer).toHaveBeenCalledWith('12345678900', 'customer@test.com');
+    expect(asaasService.createCustomer).not.toHaveBeenCalled();
+    expect(asaasService.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      customerId: 'cus_existing_123',
     }));
   });
 });

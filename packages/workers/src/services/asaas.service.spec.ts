@@ -337,4 +337,82 @@ describe('AsaasService', () => {
       service.deletePayment('pay_123')
     ).rejects.toThrow('Failed to delete Asaas payment: Bad Request - Payment cannot be deleted');
   });
+
+  describe('findCustomer', () => {
+    it('should return customer ID if found by cpfCnpj', async () => {
+      const service = new AsaasService();
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ id: 'cus_find_123' }]
+        }),
+      } as Response);
+
+      const res = await service.findCustomer('123.456.789-00');
+
+      expect(res).toBe('cus_find_123');
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api-sandbox.asaas.com/v3/customers?cpfCnpj=12345678900',
+        expect.any(Object)
+      );
+    });
+
+    it('should return customer ID if found by email when no cpf is provided', async () => {
+      const service = new AsaasService();
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ id: 'cus_find_email' }]
+        }),
+      } as Response);
+
+      const res = await service.findCustomer('', 'user@example.com');
+
+      expect(res).toBe('cus_find_email');
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api-sandbox.asaas.com/v3/customers?email=user%40example.com',
+        expect.any(Object)
+      );
+    });
+
+    it('should return null if API returns empty list', async () => {
+      const service = new AsaasService();
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: []
+        }),
+      } as Response);
+
+      const res = await service.findCustomer('12345678900');
+
+      expect(res).toBeNull();
+    });
+
+    it('should return null if neither cpfCnpj nor email are provided', async () => {
+      const service = new AsaasService();
+      const res = await service.findCustomer('', '');
+      expect(res).toBeNull();
+    });
+
+    it('should return null if fetch fails or status is not ok', async () => {
+      const service = new AsaasService();
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+      } as Response);
+
+      const res = await service.findCustomer('12345678900');
+
+      expect(res).toBeNull();
+    });
+
+    it('should return null if fetch throws an exception', async () => {
+      const service = new AsaasService();
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      const res = await service.findCustomer('12345678900');
+
+      expect(res).toBeNull();
+    });
+  });
 });

@@ -28,12 +28,16 @@ export async function processPayment(job: Job<PaymentJobData>): Promise<void> {
     throw new Error(`Tenant ${tenantId} not found`);
   }
 
-  // 2. Cria o cliente no Asaas
-  const asaasCustomerId = await asaasService.createCustomer({
-    name: customerName,
-    email: customerEmail,
-    cpfCnpj: customerCpf || '',
-  });
+  // 2. Busca ou cria o cliente no Asaas
+  let asaasCustomerId = await asaasService.findCustomer(customerCpf || '', customerEmail);
+  
+  if (!asaasCustomerId) {
+    asaasCustomerId = await asaasService.createCustomer({
+      name: customerName,
+      email: customerEmail,
+      cpfCnpj: customerCpf || '',
+    });
+  }
 
   // Data de vencimento da fatura (1 dia no futuro)
   const dueDateObj = new Date();
