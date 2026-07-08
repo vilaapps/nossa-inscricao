@@ -17,6 +17,44 @@ export default function NewEventForm() {
   const [date, setDate] = useState('');
   const [availableSlots, setAvailableSlots] = useState(100);
 
+  // Estados do Contrato
+  const [contractType, setContractType] = useState<'TEXT' | 'PDF'>('TEXT');
+  const [contractText, setContractText] = useState('');
+  const [contractPdf, setContractPdf] = useState<string | null>(null);
+
+  const handleSuggestContract = () => {
+    setContractText(`CONTRATO E REGULAMENTO PADRÃO DE INSCRIÇÃO EM EVENTOS
+
+1. DO OBJETIVO E ACEITE DOS TERMOS
+Ao se inscrever neste evento, o participante declara estar de acordo com todas as regras e condições estabelecidas pelo organizador, bem como as normas de segurança do local da prova.
+
+2. DAS CONDIÇÕES FÍSICAS E RESPONSABILIDADE
+O participante assume total responsabilidade por suas condições de saúde física e mental, declarando-se apto a participar das atividades propostas e isentando os organizadores de qualquer responsabilidade por acidentes ou problemas de saúde ocorridos durante o evento.
+
+3. DO CANCELAMENTO E REEMBOLSO
+O cancelamento da inscrição obedecerá aos prazos e condições definidas em lei (Código de Defesa do Consumidor). Solicitações feitas fora do prazo legal não darão direito a reembolso dos valores pagos.
+
+4. DIREITO DE IMAGEM
+O participante cede gratuitamente os direitos de uso de sua imagem (fotos e vídeos capturados durante o evento) para fins de divulgação e publicidade do evento e da plataforma organizadora.`);
+  };
+
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Por favor, selecione um arquivo no formato PDF.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setContractPdf(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Categorias Dinâmicas (inicia com 1 default)
   const [categories, setCategories] = useState<CategoryField[]>([
     { name: 'Geral Misto', gender: 'OPEN', slots: 100 }
@@ -88,7 +126,9 @@ export default function NewEventForm() {
         batches: batches.map(b => ({
           name: b.name,
           price: Number(b.price) || 0
-        }))
+        })),
+        contractText: contractType === 'TEXT' ? contractText : null,
+        contractPdf: contractType === 'PDF' ? contractPdf : null
       };
 
       const response = await fetch('/api/eventos', {
@@ -191,6 +231,77 @@ export default function NewEventForm() {
             onChange={(e) => setDescription(e.target.value)}
             class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs placeholder:text-zinc-700"
           />
+        </div>
+
+        {/* CONTRATO / REGULAMENTO */}
+        <div class="space-y-4 mb-8 border-t border-zinc-800/60 pt-6 font-sans">
+          <div>
+            <h3 class="font-heading text-xs font-bold text-white uppercase tracking-wider">Contrato / Regulamento Oficial</h3>
+            <p class="text-zinc-500 text-[10px] mt-1 font-mono uppercase">Escolha o formato do contrato. Se ambos forem deixados em branco, o contrato padrão será exibido.</p>
+          </div>
+
+          <div class="flex gap-4 font-mono text-xs mb-4">
+            <label class="flex items-center gap-2 cursor-pointer text-zinc-300">
+              <input
+                type="radio"
+                name="contractType"
+                checked={contractType === 'TEXT'}
+                onChange={() => setContractType('TEXT')}
+                class="accent-emerald-500"
+              />
+              Texto / Markdown
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer text-zinc-300">
+              <input
+                type="radio"
+                name="contractType"
+                checked={contractType === 'PDF'}
+                onChange={() => setContractType('PDF')}
+                class="accent-emerald-500"
+              />
+              Upload de PDF
+            </label>
+          </div>
+
+          {contractType === 'TEXT' && (
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label htmlFor="contractText" class="text-[10px] font-mono uppercase block tracking-wider text-zinc-400">Texto do Regulamento</label>
+                <button
+                  type="button"
+                  onClick={handleSuggestContract}
+                  class="text-[9px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer font-bold"
+                >
+                  Sugerir Contrato Padrão
+                </button>
+              </div>
+              <textarea
+                id="contractText"
+                rows={6}
+                placeholder="Insira os termos de responsabilidade do evento, regras gerais, políticas de reembolso..."
+                value={contractText}
+                onChange={(e) => setContractText(e.target.value)}
+                class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs font-mono placeholder:text-zinc-700"
+              />
+            </div>
+          )}
+
+          {contractType === 'PDF' && (
+            <div class="space-y-2 font-mono">
+              <label class="text-[10px] uppercase block tracking-wider text-zinc-400">Arquivo PDF do Regulamento</label>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={handlePdfUpload}
+                class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs"
+              />
+              {contractPdf && (
+                <div class="text-[10px] text-emerald-400 uppercase mt-1">
+                  ✓ PDF Carregado com sucesso (Pronto para salvar)
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

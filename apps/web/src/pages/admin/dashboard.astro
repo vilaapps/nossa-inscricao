@@ -729,6 +729,7 @@ const barGraphHeight = 160;
                 <th class="p-4 text-center">Inscrições (Pagas/Total)</th>
                 <th class="p-4 text-center">Faturamento Líquido</th>
                 <th class="p-4">Progresso de Vagas</th>
+                <th class="p-4 text-center">Ações</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
@@ -766,6 +767,26 @@ const barGraphHeight = 160;
                       <span class="text-[10px] text-zinc-400 w-8">{item.occupancy.toFixed(0)}%</span>
                     </div>
                   </td>
+                  <td class="p-4 text-center">
+                    {item.status === 'DRAFT' ? (
+                      <div class="flex items-center justify-center gap-2">
+                        <a
+                          href={`/admin/eventos/editar?id=${item.id}`}
+                          class="border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-[10px] px-3 py-1.5 uppercase font-bold tracking-wider transition-colors"
+                        >
+                          Editar
+                        </a>
+                        <button
+                          onclick={`excluirEvento('${item.id}')`}
+                          class="bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-[10px] px-3 py-1.5 uppercase font-extrabold tracking-wider transition-colors cursor-pointer"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    ) : (
+                      <span class="text-zinc-600 text-[10px] uppercase font-bold">Aprovado</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -775,4 +796,40 @@ const barGraphHeight = 160;
     </section>
   )}
 
+  <script is:inline>
+    async function excluirEvento(eventId) {
+      if (!confirm('Deseja realmente excluir este evento permanentemente? Esta ação não pode ser desfeita.')) {
+        return;
+      }
+
+      try {
+        const clerk = window.Clerk;
+        let headers = {
+          'Content-Type': 'application/json',
+        };
+
+        if (clerk && clerk.session) {
+          const token = await clerk.session.getToken();
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/admin/eventos/excluir', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ eventId }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Erro ao excluir o evento.');
+        }
+
+        alert('Evento excluído com sucesso!');
+        window.location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  </script>
 </BaseLayout>

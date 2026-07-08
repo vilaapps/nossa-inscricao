@@ -30,7 +30,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const tenantId = user.tenantId || 'tenant-1';
     const body = await request.json();
     
-    const { title, description, date, availableSlots, categories, batches } = body;
+    const { title, description, date, availableSlots, categories, batches, contractText, contractPdf } = body;
 
     // Validações básicas
     if (!title || !date || !availableSlots) {
@@ -84,6 +84,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
         availableSlots: Number(availableSlots),
         status: 'DRAFT',
         tenantId,
+        contractText: contractText || null,
+        contractPdf: contractPdf || null,
         categories: {
           create: categories.map((cat: any) => ({
             name: cat.name,

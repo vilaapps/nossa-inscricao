@@ -51,6 +51,20 @@ const formatCurrency = (val: number) => {
     currency: 'BRL',
   }).format(val);
 };
+
+const defaultContractText = `CONTRATO E REGULAMENTO PADRÃO DE INSCRIÇÃO EM EVENTOS
+
+1. DO OBJETIVO E ACEITE DOS TERMOS
+Ao se inscrever neste evento, o participante declara estar de acordo com todas as regras e condições estabelecidas pelo organizador, bem como as normas de segurança do local da prova.
+
+2. DAS CONDIÇÕES FÍSICAS E RESPONSABILIDADE
+O participante assume total responsabilidade por suas condições de saúde física e mental, declarando-se apto a participar das atividades propostas e isentando os organizadores de qualquer responsabilidade por acidentes ou problemas de saúde ocorridos durante o evento.
+
+3. DO CANCELAMENTO E REEMBOLSO
+O cancelamento da inscrição obedecerá aos prazos e condições definidas em lei (Código de Defesa do Consumidor). Solicitações feitas fora do prazo legal não darão direito a reembolso dos valores pagos.
+
+4. DIREITO DE IMAGEM
+O participante cede gratuitamente os direitos de uso de sua imagem (fotos e vídeos capturados durante o evento) para fins de divulgação e publicidade do evento e da plataforma organizadora.`;
 ---
 
 <BaseLayout title={event.title} description={event.description || ''}>
@@ -95,18 +109,40 @@ const formatCurrency = (val: number) => {
           </p>
         </div>
 
-        <!-- Regulamento Ficticio HUD -->
-        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-4">
-          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+        <!-- Regulamento Dinâmico -->
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-6">
+          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-zinc-900 pb-3">
             <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-            Regras & Informações Técnicas
+            Regulamento & Contrato Oficial
           </h3>
-          <ul class="text-xs text-zinc-500 font-mono space-y-2 list-disc list-inside">
-            <li>Entrega de kit realizada no dia anterior ao evento das 09:00 às 18:00.</li>
-            <li>Obrigatória apresentação de documento de identidade e comprovante de inscrição.</li>
-            <li>Uso do chip de cronometragem ativo é obrigatório durante todo o trajeto.</li>
-            <li>Hidratação disponível na largada, chegada e nos pontos de controle ao longo da pista.</li>
-          </ul>
+
+          {event.contractPdf ? (
+            <div class="space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0d0e12] border border-zinc-800/80 p-4 font-mono text-xs text-zinc-400">
+                <div>
+                  <div class="font-bold text-zinc-300 uppercase">Regulamento em Formato PDF</div>
+                  <div class="text-[10px] text-zinc-500 mt-0.5">O organizador disponibilizou os termos em arquivo oficial.</div>
+                </div>
+                <a
+                  href={event.contractPdf}
+                  download={`${event.slug}-regulamento.pdf`}
+                  class="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-center font-bold uppercase tracking-wider text-[10px] px-4 py-2.5 border border-blue-500/30 transition-all font-mono"
+                  target="_blank"
+                >
+                  Visualizar / Baixar PDF
+                </a>
+              </div>
+              <iframe
+                src={event.contractPdf}
+                class="w-full h-[500px] border border-zinc-900 bg-[#0d0e12]"
+                title="Regulamento Oficial do Evento"
+              />
+            </div>
+          ) : (
+            <div class="text-xs text-zinc-400 font-mono space-y-4 whitespace-pre-line leading-relaxed max-h-[400px] overflow-y-auto pr-2">
+              {event.contractText || defaultContractText}
+            </div>
+          )}
         </div>
       </div>
 

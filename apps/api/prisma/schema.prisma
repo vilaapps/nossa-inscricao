@@ -45,6 +45,8 @@ model Event {
   date           DateTime
   status         String         @default("DRAFT") // DRAFT, PUBLISHED, CLOSED, CANCELLED
   availableSlots Int            // Limite global de vagas do evento
+  contractText   String?
+  contractPdf    String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   categories     Category[]
