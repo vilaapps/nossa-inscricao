@@ -87,3 +87,5 @@ Para compilar todo o monorepo utilizando cache incremental do Turborepo:
 ```bash
 npm run build
 ```
+
+---
