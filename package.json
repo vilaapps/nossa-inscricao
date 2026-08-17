@@ -12,6 +12,7 @@
     "dev:local": "turbo run dev:local",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "workers:build": "turbo run build --filter=@syncflow/workers",
     "workers:dev": "npm run dev --workspace=@syncflow/workers",
     "workers:local": "npm run dev:local --workspace=@syncflow/workers",
     "api:dev": "npm run start:dev --workspace=api",
