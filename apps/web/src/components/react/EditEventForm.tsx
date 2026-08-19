@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { uploadFileToSupabase } from "../../lib/upload-helper";
 
 interface CategoryField {
   name: string;
@@ -18,6 +19,12 @@ interface EditEventFormProps {
     description: string | null;
     date: Date | string;
     availableSlots: number;
+    eventType: string;
+    location: string | null;
+    locationUrl: string | null;
+    bannerUrl: string | null;
+    logoUrl: string | null;
+    trailerUrl: string | null;
     contractText: string | null;
     contractPdf: string | null;
     categories: Array<{
@@ -36,41 +43,63 @@ export default function EditEventForm({ event }: EditEventFormProps) {
   // Helper to format Date/ISO string to YYYY-MM-DDTHH:MM
   const formatDatetimeLocal = (dateVal: string | Date) => {
     const d = new Date(dateVal);
-    const pad = (n: number) => n.toString().padStart(2, '0');
+    const pad = (n: number) => n.toString().padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const [title, setTitle] = useState(event.title);
-  const [description, setDescription] = useState(event.description || '');
+  const [description, setDescription] = useState(event.description || "");
   const [date, setDate] = useState(formatDatetimeLocal(event.date));
   const [availableSlots, setAvailableSlots] = useState(event.availableSlots);
+  const [eventType, setEventType] = useState(event.eventType || "CORRIDA");
+  const [location, setLocation] = useState(event.location || "");
+  const [locationUrl, setLocationUrl] = useState(event.locationUrl || "");
+
+  const [bannerUrl, setBannerUrl] = useState(event.bannerUrl || "");
+  const [logoUrl, setLogoUrl] = useState(event.logoUrl || "");
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [trailerUrl, setTrailerUrl] = useState(event.trailerUrl || "");
+  const [isUploading, setIsUploading] = useState(false);
 
   // Estados do Contrato
-  const [contractType, setContractType] = useState<'TEXT' | 'PDF'>(event.contractPdf ? 'PDF' : 'TEXT');
-  const [contractText, setContractText] = useState(event.contractText || '');
-  const [contractPdf, setContractPdf] = useState<string | null>(event.contractPdf);
+  const [contractType, setContractType] = useState<"TEXT" | "PDF">(
+    event.contractPdf ? "PDF" : "TEXT",
+  );
+  const [contractText, setContractText] = useState(event.contractText || "");
+  const [contractFile, setContractFile] = useState<File | null>(null);
 
   // Categorias Dinâmicas
   const [categories, setCategories] = useState<CategoryField[]>(
-    event.categories.map(cat => ({
+    event.categories.map((cat) => ({
       name: cat.name,
       gender: cat.gender,
-      slots: cat.availableSlots
-    }))
+      slots: cat.availableSlots,
+    })),
   );
+
+  // Helper to safely parse Prisma Decimal from JSON
+  const parseDecimal = (val: any) => {
+    if (typeof val === "string" || typeof val === "number") return String(val);
+    if (val && typeof val === "object" && "d" in val) {
+      // Basic fallback for { d: [99, 90] } if toString is missing
+      return val.d ? val.d.join("") : "0";
+    }
+    return String(val);
+  };
 
   // Lotes Dinâmicos
   const [batches, setBatches] = useState<BatchField[]>(
-    event.batches.map(bat => ({
+    event.batches.map((bat) => ({
       name: bat.name,
-      price: bat.price.toString()
-    }))
+      price: parseDecimal(bat.price),
+    })),
   );
 
   // Estados de Envio
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleSuggestContract = () => {
     setContractText(`CONTRATO E REGULAMENTO PADRÃO DE INSCRIÇÃO EM EVENTOS
@@ -92,22 +121,18 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      alert('Por favor, selecione um arquivo no formato PDF.');
-      e.target.value = '';
+    if (file.type !== "application/pdf") {
+      alert("Por favor, selecione um arquivo no formato PDF.");
+      e.target.value = "";
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setContractPdf(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setContractFile(file);
   };
 
   // Adicionar/Remover Categoria
   const addCategory = () => {
-    setCategories([...categories, { name: '', gender: 'OPEN', slots: 50 }]);
+    setCategories([...categories, { name: "", gender: "OPEN", slots: 50 }]);
   };
 
   const removeCategory = (index: number) => {
@@ -115,7 +140,11 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
     setCategories(categories.filter((_, i) => i !== index));
   };
 
-  const updateCategory = (index: number, key: keyof CategoryField, value: any) => {
+  const updateCategory = (
+    index: number,
+    key: keyof CategoryField,
+    value: any,
+  ) => {
     const updated = [...categories];
     updated[index] = { ...updated[index], [key]: value };
     setCategories(updated);
@@ -123,7 +152,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
   // Adicionar/Remover Lote
   const addBatch = () => {
-    setBatches([...batches, { name: '', price: '' }]);
+    setBatches([...batches, { name: "", price: "" }]);
   };
 
   const removeBatch = (index: number) => {
@@ -140,16 +169,48 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
   // Enviar formulário de edição
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Front-end validations
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      setErrorMessage("A data do evento não pode ser retroativa.");
+      return;
+    }
+
+    const totalCategorySlots = categories.reduce((sum, cat) => sum + Number(cat.slots || 0), 0);
+    if (totalCategorySlots > availableSlots) {
+      setErrorMessage(`A soma das vagas das categorias (${totalCategorySlots}) não pode ultrapassar o limite geral do evento (${availableSlots}).`);
+      return;
+    }
+
     setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
+    setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       const clerk = (window as any).Clerk;
       if (!clerk || !clerk.session) {
-        throw new Error('Sessão expirada. Faça login novamente.');
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const token = await clerk.session.getToken();
+
+      setIsUploading(true);
+      let finalBannerUrl = bannerUrl;
+      let finalLogoUrl = logoUrl;
+      let finalContractPdf = contractFile ? "" : (event.contractPdf || null);
+
+      if (bannerFile) {
+        finalBannerUrl = await uploadFileToSupabase(bannerFile, "banners");
+      }
+      if (logoFile) {
+        finalLogoUrl = await uploadFileToSupabase(logoFile, "logos");
+      }
+      if (contractFile && contractType === "PDF") {
+        finalContractPdf = await uploadFileToSupabase(contractFile, "general");
+      }
+      setIsUploading(false);
 
       const payload = {
         eventId: event.id,
@@ -157,49 +218,72 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         description,
         date,
         availableSlots: Number(availableSlots),
+        eventType,
+        location,
+        locationUrl,
+        bannerUrl: finalBannerUrl,
+        logoUrl: finalLogoUrl,
+        trailerUrl,
         categories,
-        batches: batches.map(b => ({
+        batches: batches.map((b) => ({
           name: b.name,
-          price: Number(b.price) || 0
+          price: Number(b.price) || 0,
         })),
-        contractText: contractType === 'TEXT' ? contractText : null,
-        contractPdf: contractType === 'PDF' ? contractPdf : null
+        contractText: contractType === "TEXT" ? contractText : null,
+        contractPdf: contractType === "PDF" ? finalContractPdf : null,
       };
 
-      const response = await fetch('/api/admin/eventos/editar', {
-        method: 'POST',
+      const response = await fetch("/api/admin/eventos/editar", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({ message: 'Erro desconhecido.' }));
-        throw new Error(errData.message || 'Falha ao salvar edições do evento.');
+        const errData = await response
+          .json()
+          .catch(() => ({ message: "Erro desconhecido." }));
+        throw new Error(
+          errData.message || "Falha ao salvar edições do evento.",
+        );
       }
 
-      setSuccessMessage('Evento editado com sucesso! Redirecionando...');
+      setSuccessMessage("Evento editado com sucesso! Redirecionando...");
 
       setTimeout(() => {
-        window.location.href = '/admin/dashboard';
+        window.location.href = "/painel-organizador";
       }, 1500);
-
     } catch (err: any) {
-      setErrorMessage(err.message || 'Ocorreu um erro ao salvar o evento.');
+      setErrorMessage(err.message || "Ocorreu um erro ao salvar o evento.");
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full bg-[#15171f] border border-zinc-800 p-6 md:p-8 relative">
+    <form
+      onSubmit={handleSubmit}
+      className="w-full bg-[#15171f] border border-zinc-800 p-6 md:p-8 relative"
+    >
       <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
 
       <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">Editar Evento (Rascunho)</h2>
-        <p className="text-zinc-500 text-xs mt-1 font-mono uppercase">Atualize as informações da prova esportiva.</p>
+        <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">
+          Editar Evento (Rascunho)
+        </h2>
+        <p className="text-zinc-500 text-xs mt-1 font-mono uppercase">
+          Atualize as informações da prova esportiva.
+        </p>
       </div>
+
+      {isUploading && (
+        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+          <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent animate-spin rounded-full inline-block"></span>
+          Fazendo upload de arquivo...
+        </div>
+      )}
 
       {errorMessage && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase">
@@ -217,7 +301,12 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       {/* DADOS PRINCIPAIS DO EVENTO */}
       <div className="space-y-4 font-mono text-xs text-zinc-400 mb-8">
         <div className="space-y-2">
-          <label htmlFor="title" className="text-[10px] uppercase block tracking-wider">Título Oficial do Evento</label>
+          <label
+            htmlFor="title"
+            className="text-[10px] uppercase block tracking-wider"
+          >
+            Título Oficial do Evento
+          </label>
           <input
             type="text"
             id="title"
@@ -230,8 +319,13 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <label htmlFor="date" className="text-[10px] uppercase block tracking-wider">Data & Horário do Evento</label>
+          <div className="space-y-2">
+            <label
+              htmlFor="date"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Data & Horário do Evento
+            </label>
             <input
               type="datetime-local"
               id="date"
@@ -242,22 +336,198 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             />
           </div>
 
-          <div class="space-y-2">
-            <label htmlFor="slots" className="text-[10px] uppercase block tracking-wider">Limite Físico Geral de Vagas</label>
+          <div className="space-y-2">
+            <label
+              htmlFor="eventType"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Modalidade do Evento
+            </label>
+            <select
+              id="eventType"
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase appearance-none"
+            >
+              <option value="CORRIDA">Corrida de Rua</option>
+              <option value="ULTRA_TRAIL">Ultra Trail / Trilha</option>
+              <option value="CICLISMO">Ciclismo</option>
+              <option value="MOUNTAIN_BIKE">Mountain Bike</option>
+              <option value="TRIATHLON">Triathlon</option>
+              <option value="DUATHLON">Duathlon</option>
+              <option value="AVENTURA">Corrida de Aventura</option>
+              <option value="OUTRO">Outra Modalidade</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="slots"
+            className="text-[10px] uppercase block tracking-wider"
+          >
+            Limite Físico Geral de Vagas
+          </label>
+          <input
+            type="number"
+            id="slots"
+            required
+            min="1"
+            value={availableSlots}
+            onChange={(e) => setAvailableSlots(Number(e.target.value))}
+            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label
+              htmlFor="location"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Endereço (Texto)
+            </label>
             <input
-              type="number"
-              id="slots"
-              required
-              min="1"
-              value={availableSlots}
-              onChange={(e) => setAvailableSlots(Number(e.target.value))}
-              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+              type="text"
+              id="location"
+              placeholder="EX: PRAÇA PRINCIPAL, CENTRO"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="locationUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Link Iframe Google Maps
+            </label>
+            <input
+              type="text"
+              id="locationUrl"
+              placeholder="https://www.google.com/maps/embed?pb=..."
+              value={locationUrl}
+              onChange={(e) => setLocationUrl(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
             />
           </div>
         </div>
 
-        <div className="space-y-2 font-sans">
-          <label htmlFor="desc" className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400">Regulamento / Informações Básicas</label>
+        {/* MÍDIAS DO EVENTO (CASO 3) */}
+        <div className="space-y-4 pt-6 border-t border-zinc-800/60">
+          <h3 className="font-heading text-lg font-bold text-white uppercase tracking-wider">
+            Mídia e Identidade Visual
+          </h3>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="bannerUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Banner Principal (URL ou Upload)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="bannerUrl"
+                placeholder="https://..."
+                value={bannerUrl}
+                onChange={(e) => setBannerUrl(e.target.value)}
+                className="flex-grow bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+              />
+              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
+                Selecionar
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setBannerFile(file);
+                      setBannerUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {bannerUrl && (
+              <img
+                src={bannerUrl}
+                alt="Preview Banner"
+                className="h-24 w-auto object-cover border border-zinc-800 mt-2"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="logoUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Logo da Organização (URL ou Upload)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="logoUrl"
+                placeholder="https://..."
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                className="flex-grow bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+              />
+              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
+                Selecionar
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setLogoFile(file);
+                      setLogoUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt="Preview Logo"
+                className="h-16 w-16 object-cover border border-zinc-800 mt-2 rounded-full"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="trailerUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Trailer / Vídeo Promocional (YouTube Embed URL)
+            </label>
+            <input
+              type="text"
+              id="trailerUrl"
+              placeholder="https://www.youtube.com/embed/..."
+              value={trailerUrl}
+              onChange={(e) => setTrailerUrl(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2 font-sans pt-6 border-t border-zinc-800/60">
+          <label
+            htmlFor="desc"
+            className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400"
+          >
+            Regulamento / Informações Básicas
+          </label>
           <textarea
             id="desc"
             rows={4}
@@ -271,8 +541,13 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         {/* CONTRATO / REGULAMENTO */}
         <div className="space-y-4 mb-8 border-t border-zinc-800/60 pt-6 font-sans">
           <div>
-            <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">Contrato / Regulamento Oficial</h3>
-            <p className="text-zinc-500 text-[10px] mt-1 font-mono uppercase">Escolha o formato do contrato. Se ambos forem deixados em branco, o contrato padrão será exibido.</p>
+            <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+              Contrato / Regulamento Oficial
+            </h3>
+            <p className="text-zinc-500 text-[10px] mt-1 font-mono uppercase">
+              Escolha o formato do contrato. Se ambos forem deixados em branco,
+              o contrato padrão será exibido.
+            </p>
           </div>
 
           <div className="flex gap-4 font-mono text-xs mb-4">
@@ -280,8 +555,8 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               <input
                 type="radio"
                 name="editContractType"
-                checked={contractType === 'TEXT'}
-                onChange={() => setContractType('TEXT')}
+                checked={contractType === "TEXT"}
+                onChange={() => setContractType("TEXT")}
                 className="accent-emerald-500"
               />
               Texto / Markdown
@@ -290,18 +565,23 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               <input
                 type="radio"
                 name="editContractType"
-                checked={contractType === 'PDF'}
-                onChange={() => setContractType('PDF')}
+                checked={contractType === "PDF"}
+                onChange={() => setContractType("PDF")}
                 className="accent-emerald-500"
               />
               Upload de PDF
             </label>
           </div>
 
-          {contractType === 'TEXT' && (
+          {contractType === "TEXT" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label htmlFor="contractText" className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400">Texto do Regulamento</label>
+                <label
+                  htmlFor="contractText"
+                  className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400"
+                >
+                  Texto do Regulamento
+                </label>
                 <button
                   type="button"
                   onClick={handleSuggestContract}
@@ -321,18 +601,24 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             </div>
           )}
 
-          {contractType === 'PDF' && (
+          {contractType === "PDF" && (
             <div className="space-y-2 font-mono">
-              <label className="text-[10px] uppercase block tracking-wider text-zinc-400">Arquivo PDF do Regulamento</label>
+              <label className="text-[10px] uppercase block tracking-wider text-zinc-400">
+                Arquivo PDF do Regulamento
+              </label>
               <input
                 type="file"
                 accept="application/pdf"
                 onChange={handlePdfUpload}
                 className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs"
               />
-              {contractPdf && (
+              {contractFile ? (
                 <div className="text-[10px] text-emerald-400 uppercase mt-1">
-                  ✓ PDF Carregado com sucesso (Pronto para salvar)
+                  ✓ PDF Selecionado: {contractFile.name} (Pronto para salvar)
+                </div>
+              ) : event.contractPdf && (
+                <div className="text-[10px] text-emerald-400 uppercase mt-1">
+                  ✓ PDF já cadastrado na plataforma
                 </div>
               )}
             </div>
@@ -343,7 +629,9 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       {/* CATEGORIAS DO EVENTO */}
       <div className="space-y-4 mb-8">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">Categorias Oficiais</h3>
+          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+            Categorias Oficiais
+          </h3>
           <button
             type="button"
             onClick={addCategory}
@@ -355,24 +643,35 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
         <div className="space-y-3">
           {categories.map((cat, index) => (
-            <div key={index} className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs">
+            <div
+              key={index}
+              className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs"
+            >
               <div className="flex-grow space-y-2 w-full">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">Nome da Categoria</label>
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Nome da Categoria
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="EX: ELITE MASCULINO"
                   value={cat.name}
-                  onChange={(e) => updateCategory(index, 'name', e.target.value)}
+                  onChange={(e) =>
+                    updateCategory(index, "name", e.target.value)
+                  }
                   className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
                 />
               </div>
 
               <div className="w-full md:w-48 space-y-2">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">Gênero Aceito</label>
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Gênero Aceito
+                </label>
                 <select
                   value={cat.gender}
-                  onChange={(e) => updateCategory(index, 'gender', e.target.value)}
+                  onChange={(e) =>
+                    updateCategory(index, "gender", e.target.value)
+                  }
                   className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
                 >
                   <option value="OPEN">MISTO / LIVRE</option>
@@ -382,13 +681,17 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               </div>
 
               <div className="w-full md:w-36 space-y-2">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">Vagas Específicas</label>
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Vagas Específicas
+                </label>
                 <input
                   type="number"
                   required
                   min="1"
                   value={cat.slots}
-                  onChange={(e) => updateCategory(index, 'slots', Number(e.target.value))}
+                  onChange={(e) =>
+                    updateCategory(index, "slots", Number(e.target.value))
+                  }
                   className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
                 />
               </div>
@@ -410,7 +713,9 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       {/* LOTES DO EVENTO */}
       <div className="space-y-4 mb-8">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">Lotes de Inscrição</h3>
+          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+            Lotes de Inscrição
+          </h3>
           <button
             type="button"
             onClick={addBatch}
@@ -422,21 +727,28 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
         <div className="space-y-3">
           {batches.map((bat, index) => (
-            <div key={index} className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs">
+            <div
+              key={index}
+              className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs"
+            >
               <div className="flex-grow space-y-2 w-full">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">Nome do Lote</label>
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Nome do Lote
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="EX: LOTE PROMOCIONAL ou 2º LOTE"
                   value={bat.name}
-                  onChange={(e) => updateBatch(index, 'name', e.target.value)}
+                  onChange={(e) => updateBatch(index, "name", e.target.value)}
                   className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
                 />
               </div>
 
               <div className="w-full md:w-52 space-y-2">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">Preço Inscrição (R$)</label>
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Preço Inscrição (R$)
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -444,7 +756,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   min="0"
                   placeholder="99.90"
                   value={bat.price}
-                  onChange={(e) => updateBatch(index, 'price', e.target.value)}
+                  onChange={(e) => updateBatch(index, "price", e.target.value)}
                   className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
                 />
               </div>
@@ -465,7 +777,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
       <div className="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
         <a
-          href="/admin/dashboard"
+          href="/painel-organizador"
           className="border border-zinc-800 hover:border-zinc-700 text-zinc-500 hover:text-white text-xs uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
         >
           Cancelar
@@ -475,7 +787,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           disabled={isSubmitting}
           className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
         >
-          {isSubmitting ? 'SALVANDO ALTERAÇÕES...' : 'SALVAR ALTERAÇÕES'}
+          {isSubmitting ? "SALVANDO ALTERAÇÕES..." : "SALVAR ALTERAÇÕES"}
         </button>
       </div>
     </form>

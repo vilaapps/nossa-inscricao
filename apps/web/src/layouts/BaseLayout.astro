@@ -73,7 +73,7 @@ if (userId) {
           
           {userId ? (
             userRole === 'PARTICIPANT' ? (
-              <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+              <a href="/painel-organizador" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
                 <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
                 Traga seu evento
               </a>
@@ -83,13 +83,13 @@ if (userId) {
                 Painel Geral
               </a>
             ) : (
-              <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+              <a href="/painel-organizador" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
                 <span class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
                 Painel Organizador
               </a>
             )
           ) : (
-            <a href="/admin/dashboard" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+            <a href="/sign-in" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
               <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
               Traga seu evento
             </a>
@@ -102,7 +102,7 @@ if (userId) {
             <>
               <!-- Link do Painel visivel no mobile -->
               <a href="/painel" class="md:hidden text-xs text-zinc-400 hover:text-white">Inscrições</a>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
             </>
           ) : (
             <div class="bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs px-4 py-2 uppercase tracking-widest font-semibold cursor-pointer transition-all duration-200">
@@ -123,9 +123,9 @@ if (userId) {
       <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>&copy; {new Date().getFullYear()} SYNCFLOW. TODOS OS DIREITOS RESERVADOS.</div>
         <div class="flex items-center space-x-6 text-[10px]">
-          <a href="#" class="hover:text-zinc-400 transition-colors">Termos</a>
-          <a href="#" class="hover:text-zinc-400 transition-colors">Privacidade</a>
-          <a href="#" class="hover:text-zinc-400 transition-colors">Suporte</a>
+          <a href="/termos" class="hover:text-zinc-400 transition-colors">Termos</a>
+          <a href="/privacidade" class="hover:text-zinc-400 transition-colors">Privacidade</a>
+          <a href="/suporte" class="hover:text-zinc-400 transition-colors">Suporte</a>
         </div>
       </div>
     </footer>

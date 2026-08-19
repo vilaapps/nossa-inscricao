@@ -7,14 +7,15 @@ import clerk from '@clerk/astro';
 
 // https://astro.build/config
 export default defineConfig({
+  site: 'https://nossainscricao.com.br',
   output: 'server',
-  envDir: '../../',
   adapter: vercel(),
   integrations: [
     react(),
     clerk(),
   ],
   vite: {
+    envDir: '../../',
     plugins: [tailwindcss()],
     resolve: {
       alias: {

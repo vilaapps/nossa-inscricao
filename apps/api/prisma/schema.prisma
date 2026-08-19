@@ -43,10 +43,28 @@ model Event {
   description    String?
   slug           String         @unique
   date           DateTime
-  status         String         @default("DRAFT") // DRAFT, PUBLISHED, CLOSED, CANCELLED
+  status         String         @default("DRAFT") // DRAFT, PUBLISHED, CLOSED, CANCELLED, REJECTED, ARCHIVED
   availableSlots Int            // Limite global de vagas do evento
   contractText   String?
   contractPdf    String?
+
+  // Caso 4 — Modalidade/Tipo do evento (filtro dinâmico na homepage)
+  eventType      String         @default("CORRIDA") // CORRIDA, CICLISMO, ULTRA_TRAIL, DUATHLON, TRIATHLON, MOUNTAIN_BIKE, AVENTURA, OUTRO
+
+  // Caso 2 — Localização e Google Maps
+  location       String?        // Endereço textual
+  locationUrl    String?        // Link Google Maps
+
+  // Caso 3 — Mídia do evento
+  bannerUrl      String?        // URL do banner no Supabase Storage
+  logoUrl        String?        // URL da logomarca no Supabase Storage
+  trailerUrl     String?        // Link do YouTube (trailer)
+
+  // Caso 1 — Rejeição e arquivamento
+  rejectionReason String?
+  rejectedAt      DateTime?
+  archivedAt      DateTime?
+
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   categories     Category[]
@@ -56,6 +74,7 @@ model Event {
 
   @@index([tenantId])
   @@index([status])
+  @@index([eventType])
 }
 
 model Category {

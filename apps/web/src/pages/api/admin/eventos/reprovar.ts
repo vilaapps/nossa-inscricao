@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
     if (!user || user.role !== 'ADMIN') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas administradores podem aprovar eventos.' }), {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas administradores podem reprovar eventos.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -29,10 +29,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // 2. Extrair dados da requisição
     const body = await request.json();
-    const { eventId } = body;
+    const { eventId, reason } = body;
 
-    if (!eventId) {
-      return new Response(JSON.stringify({ message: 'eventId é obrigatório.' }), {
+    if (!eventId || !reason) {
+      return new Response(JSON.stringify({ message: 'eventId e reason (motivo) são obrigatórios.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -51,17 +51,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     if (event.status !== 'DRAFT') {
-      return new Response(JSON.stringify({ message: 'Apenas eventos em rascunho (DRAFT) podem ser aprovados.' }), {
+      return new Response(JSON.stringify({ message: 'Apenas eventos em rascunho (DRAFT) podem ser reprovados.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // 4. Atualizar o status do Evento para PUBLISHED no banco de dados
+    // 4. Atualizar o status do Evento para REJECTED no banco de dados
     const updatedEvent = await prisma.event.update({
       where: { id: eventId },
       data: {
-        status: 'PUBLISHED',
+        status: 'REJECTED',
+        rejectionReason: reason,
+        rejectedAt: new Date()
       },
     });
 
@@ -71,7 +73,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
   } catch (err: any) {
-    console.error('Erro ao aprovar evento:', err);
+    console.error('Erro ao reprovar evento:', err);
     return new Response(JSON.stringify({ message: err.message || 'Erro interno do servidor.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

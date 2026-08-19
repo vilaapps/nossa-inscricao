@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
     if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas organizadores ou administradores podem excluir eventos.' }), {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas organizadores ou administradores podem arquivar eventos.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -38,19 +38,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // 3. Buscar o evento com inscrições para validar permissão e status
+    // 3. Buscar o evento para validar permissão e status
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: {
-        registrations: {
-          where: {
-            OR: [
-              { status: 'CONFIRMED' },
-              { paymentStatus: 'PAID' },
-            ]
-          }
-        }
-      }
     });
 
     if (!event) {
@@ -60,40 +50,30 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Apenas admins podem excluir qualquer evento, organizadores só podem excluir os seus próprios
+    // Apenas admins podem arquivar qualquer evento, organizadores só podem arquivar os seus próprios
     if (user.role === 'ORGANIZER' && event.tenantId !== user.tenantId) {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Você só pode excluir eventos da sua organização.' }), {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Você só pode arquivar eventos da sua organização.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Validar status permitidos para exclusão
-    const isDraft = event.status === 'DRAFT';
-    const isRejected = event.status === 'REJECTED';
-    const isPublishedWithoutRegistrations = event.status === 'PUBLISHED' && event.registrations.length === 0;
-
-    if (!isDraft && !isRejected && !isPublishedWithoutRegistrations) {
-      return new Response(JSON.stringify({ 
-        message: 'Acesso negado. Apenas rascunhos, eventos rejeitados ou eventos publicados sem nenhuma inscrição paga podem ser excluídos.' 
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 4. Excluir o evento fisicamente
-    await prisma.event.delete({
+    // 4. Arquivar logicamente o evento
+    const updatedEvent = await prisma.event.update({
       where: { id: eventId },
+      data: {
+        status: 'ARCHIVED',
+        archivedAt: new Date()
+      }
     });
 
-    return new Response(JSON.stringify({ success: true, message: 'Evento excluído com sucesso.' }), {
+    return new Response(JSON.stringify({ success: true, message: 'Evento arquivado com sucesso.' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
 
   } catch (err: any) {
-    console.error('Erro ao excluir evento:', err);
+    console.error('Erro ao arquivar evento:', err);
     return new Response(JSON.stringify({ message: err.message || 'Erro interno do servidor.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

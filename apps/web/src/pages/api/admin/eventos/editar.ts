@@ -28,7 +28,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const body = await request.json();
     
-    const { eventId, title, description, date, availableSlots, categories, batches, contractText, contractPdf } = body;
+    const { eventId, title, description, date, availableSlots, eventType, location, locationUrl, bannerUrl, logoUrl, trailerUrl, categories, batches, contractText, contractPdf } = body;
 
     if (!eventId || !title || !date || !availableSlots) {
       return new Response(JSON.stringify({ message: 'ID, título, data e limite de vagas são obrigatórios.' }), {
@@ -37,8 +37,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      return new Response(JSON.stringify({ message: 'A data do evento não pode ser retroativa.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (!categories || categories.length === 0) {
       return new Response(JSON.stringify({ message: 'O evento precisa ter pelo menos uma categoria cadastrada.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const totalCategorySlots = categories.reduce((sum: number, cat: any) => sum + Number(cat.slots || 0), 0);
+    if (totalCategorySlots > Number(availableSlots)) {
+      return new Response(JSON.stringify({ message: `A soma das vagas das categorias (${totalCategorySlots}) não pode ultrapassar o limite geral do evento (${availableSlots}).` }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -117,6 +135,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
           description: description || '',
           date: new Date(date),
           availableSlots: Number(availableSlots),
+          eventType: eventType || 'CORRIDA',
+          location: location || null,
+          locationUrl: locationUrl || null,
+          bannerUrl: bannerUrl || null,
+          logoUrl: logoUrl || null,
+          trailerUrl: trailerUrl || null,
           contractText: contractText || null,
           contractPdf: contractPdf || null,
           categories: {

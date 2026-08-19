@@ -1,0 +1,18 @@
+-- ANTIGOS, ESTÁ NO ATUAL ALTERAÇÕES, AVALISE SE TUDO FOI FEITO
+- Eventos não publicados podem ser editados, eventos publicados não podem ser editados. O administrador pode excluir eventos publicados desde que ele não tenha nenhuma inscrição paga. Se um evento tiver inscrições pagas, ele não pode ser editado ou excluído apenas arquivado e com opção de estornar todos os pagamentos e notificar os inscritos. Na tela de aprovação do evento no painel do admin master, devemos poder visualizar todas as informações cadastradas do evento e deve ter a opção de publicar ou reprovar com um comentário justificando a reprovação que será enviado ao email do usuário que cadastrou o evento, se for reprovado, o evento deve ser movido para a lista de eventos reprovados e com status correto e o usuário deve ser notificado. Quem cadastrou o evento pode ir no seu painel e verificar a mensagem de rejeição
+- o campo para colocar o endereço/link do endereço onde será a competição/evento gostaria da integração com o maps aparecendo o local do evento no mapa
+- upload do Banner do evento no cadastro/edição do evento e upload de logomarca da empresa/evento/competição, ambos devem ter a especificação mais comum usada e ser bem rigido quanto ao upload, no cadastro de evento deve ter a opção de colocar um trailer que pode ser um link do youtube
+- Na tela inicial temos um filtro TODOS/CORRIDA/CICLISMO/ULTRA TRAIL. Mas na verdade não integramos categoria do evento apenas categoria das corridas, então precisamos implementar a categoria dos eventos e que seja possível filtrar por ela igual já esta no front de forma fixa
+- Os indicadores do topo da página ('Vagas Preenchidas: 87%') aparentam ser valores fixos, não calculados dinamicamente, vamos calcular
+- A tag meta 'canonical' do site aponta para 'http://localhost:4321/' em vez do domínio real. Explique o que é e sugira uma correção
+- A página de detalhes do evento exibe o UUID interno do evento (ex.: 'DETALHES DO EVENTO | ID: b0a94709-3195-44d4-974a-34a2616198bc') diretamente para o usuário final. Vamos remover esse tipo de esposição, analise também em outras paginas, como admin
+- Os links 'Termos', 'Privacidade' e 'Suporte' no rodapé apontam para '#' (não implementados). Publicar páginas reais de Termos de Uso e Política de Privacidade antes de qualquer inscrição em ambiente de produção.
+- O link 'Traga seu evento' no menu público leva direto para a rota /admin/dashboard. Expõe publicamente o caminho da área administrativa. Precisa garantir que a rota tenha autenticação/gate adequado antes de ir para produção.
+
+
+-- NOVOS 19/08
+- No cadastro/edição de evento os uploads só devem ser efetuados ao salvar o evento, para não usar demais o bucket
+- Ao editar o evento não esta carregando os valores previos dos lotes de inscrição, fica só o nome e no campo de valores fica vazio, ao fazer o upload das imagens estamos exibindo a url o que não é correto, devemos exibir a previa da imagem como já fazemos e talvez o nome do arquivo só, mas sem exibir a url do bucket
+- Quando abro a tela de controle de competições não está exibindo o valor correto de Inscrições (Pagas/Total) está ficando 0 sendo que eu cadastrei a competição com 100 vagas, está sendo possivel distribuir em categorias diferentes mais vagas do que o adicionado, por exemplo 100 vagas totais, mas ao distribuir nos lotes eu coloco 100 vagas no lote 1 e 100 vagas no lote 2 ele permite
+- Está sendo possivel salvar evento com data de acontecimento no passado
+- Ainda não é possivel visualizar os dados completos do evento como administrador do sistema antes de aprovar. Não encontrei onde listamos todos eventos como administrador para excluir ou desaprovar como solicitado na listagem de cima 
