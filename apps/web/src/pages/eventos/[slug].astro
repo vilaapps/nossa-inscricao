@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { PrismaClient } from '@prisma/client';
 import { SignInButton } from '@clerk/astro/components';
+import { marked } from 'marked';
 
 const { userId } = Astro.locals.auth();
 
@@ -173,8 +174,8 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               />
             </div>
           ) : (
-            <div class="text-xs text-zinc-400 font-mono space-y-4 whitespace-pre-line leading-relaxed max-h-[400px] overflow-y-auto pr-2">
-              {event.contractText || defaultContractText}
+            <div class="text-xs text-zinc-300 font-sans space-y-4 max-h-[400px] overflow-y-auto pr-2 markdown-body">
+              <Fragment set:html={marked.parse(event.contractText || defaultContractText)} />
             </div>
           )}
         </div>

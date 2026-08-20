@@ -1,0 +1,176 @@
+---
+// CyberDialog.astro
+// Este componente injeta um sistema global de modais de alerta, confirmação e prompt
+// com estilo Cyberpunk HUD, substituindo os nativos alert(), confirm() e prompt().
+---
+
+<div id="cyber-dialog-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden font-mono">
+  <div class="bg-[#15171f] border border-zinc-800 w-full max-w-md p-6 relative shadow-[0_0_50px_rgba(0,0,0,0.5)] transform scale-95 opacity-0 transition-all duration-200" id="cyber-dialog-box">
+    
+    <!-- Detalhes Cyberpunk -->
+    <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-700 pointer-events-none"></div>
+    <div class="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-zinc-700 pointer-events-none"></div>
+    
+    <!-- Header -->
+    <div class="flex items-center gap-2 mb-4">
+      <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" id="cyber-dialog-indicator"></span>
+      <h3 class="text-xs uppercase tracking-widest text-emerald-400 font-bold" id="cyber-dialog-title">SYSTEM_ALERT</h3>
+    </div>
+    
+    <!-- Content -->
+    <div class="text-zinc-300 text-sm mb-6 leading-relaxed" id="cyber-dialog-message">
+      <!-- Mensagem entra aqui -->
+    </div>
+
+    <!-- Input for Prompt -->
+    <div id="cyber-dialog-input-container" class="hidden mb-6">
+      <input type="text" id="cyber-dialog-input" class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-2 text-sm outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-700" autocomplete="off" />
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-end gap-3 border-t border-zinc-800/60 pt-4">
+      <button id="cyber-dialog-cancel" class="hidden border border-zinc-700 hover:border-zinc-600 text-zinc-400 hover:text-white text-[10px] uppercase px-4 py-2 font-bold tracking-wider transition-colors">
+        Cancelar
+      </button>
+      <button id="cyber-dialog-confirm" class="bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] uppercase px-6 py-2 font-extrabold tracking-wider transition-colors">
+        Confirmar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  window._cyberDialogResolve = null;
+
+  function showCyberDialog(options) {
+    const overlay = document.getElementById('cyber-dialog-overlay');
+    const box = document.getElementById('cyber-dialog-box');
+    const title = document.getElementById('cyber-dialog-title');
+    const message = document.getElementById('cyber-dialog-message');
+    const inputContainer = document.getElementById('cyber-dialog-input-container');
+    const input = document.getElementById('cyber-dialog-input');
+    const btnCancel = document.getElementById('cyber-dialog-cancel');
+    const btnConfirm = document.getElementById('cyber-dialog-confirm');
+    const indicator = document.getElementById('cyber-dialog-indicator');
+
+    // Configurações
+    title.textContent = options.title || 'SYSTEM_ALERT';
+    message.textContent = options.message || '';
+    
+    // Cores e Ícones dependendo do tipo (info, warning, error)
+    if (options.type === 'error') {
+      title.classList.replace('text-emerald-400', 'text-red-400');
+      indicator.classList.replace('bg-emerald-500', 'bg-red-500');
+      btnConfirm.classList.replace('bg-emerald-500', 'bg-red-500');
+      btnConfirm.classList.replace('hover:bg-emerald-600', 'hover:bg-red-600');
+    } else if (options.type === 'warning') {
+      title.classList.replace('text-emerald-400', 'text-amber-500');
+      title.classList.replace('text-red-400', 'text-amber-500');
+      indicator.classList.replace('bg-emerald-500', 'bg-amber-500');
+      indicator.classList.replace('bg-red-500', 'bg-amber-500');
+      btnConfirm.classList.replace('bg-emerald-500', 'bg-amber-500');
+      btnConfirm.classList.replace('bg-red-500', 'bg-amber-500');
+      btnConfirm.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
+      btnConfirm.classList.replace('hover:bg-red-600', 'hover:bg-amber-600');
+    } else {
+      title.className = 'text-xs uppercase tracking-widest text-emerald-400 font-bold';
+      indicator.className = 'w-2 h-2 bg-emerald-500 rounded-full animate-pulse';
+      btnConfirm.className = 'bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] uppercase px-6 py-2 font-extrabold tracking-wider transition-colors';
+    }
+
+    if (options.isPrompt) {
+      inputContainer.classList.remove('hidden');
+      input.value = '';
+      input.placeholder = options.placeholder || '';
+    } else {
+      inputContainer.classList.add('hidden');
+    }
+
+    if (options.showCancel) {
+      btnCancel.classList.remove('hidden');
+    } else {
+      btnCancel.classList.add('hidden');
+    }
+
+    // Handlers
+    const cleanup = () => {
+      box.classList.remove('scale-100', 'opacity-100');
+      box.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+      }, 200);
+      btnConfirm.onclick = null;
+      btnCancel.onclick = null;
+      input.onkeydown = null;
+    };
+
+    btnConfirm.onclick = () => {
+      cleanup();
+      if (window._cyberDialogResolve) {
+        window._cyberDialogResolve(options.isPrompt ? input.value : true);
+      }
+    };
+
+    btnCancel.onclick = () => {
+      cleanup();
+      if (window._cyberDialogResolve) {
+        window._cyberDialogResolve(options.isPrompt ? null : false);
+      }
+    };
+
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        btnConfirm.click();
+      }
+    };
+
+    // Show
+    overlay.classList.remove('hidden');
+    // Força reflow
+    void overlay.offsetWidth;
+    box.classList.remove('scale-95', 'opacity-0');
+    box.classList.add('scale-100', 'opacity-100');
+    
+    if (options.isPrompt) {
+      input.focus();
+    } else {
+      btnConfirm.focus();
+    }
+
+    return new Promise((resolve) => {
+      window._cyberDialogResolve = resolve;
+    });
+  }
+
+  // APIs Globais Injetadas no Window
+  window.cyberAlert = function(message, title = 'SYSTEM_MESSAGE', type = 'info') {
+    return showCyberDialog({
+      message,
+      title,
+      type,
+      showCancel: false,
+      isPrompt: false
+    });
+  };
+
+  window.cyberConfirm = function(message, title = 'CONFIRM_ACTION', type = 'warning') {
+    return showCyberDialog({
+      message,
+      title,
+      type,
+      showCancel: true,
+      isPrompt: false
+    });
+  };
+
+  window.cyberPrompt = function(message, placeholder = '', title = 'AWAITING_INPUT', type = 'info') {
+    return showCyberDialog({
+      message,
+      title,
+      type,
+      showCancel: true,
+      isPrompt: true,
+      placeholder
+    });
+  };
+</script>

@@ -38,10 +38,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     const selectedDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (selectedDate < today) {
-      return new Response(JSON.stringify({ message: 'A data do evento não pode ser retroativa.' }), {
+    const now = new Date();
+    
+    // O evento deve acontecer estritamente no futuro, mesmo na edição
+    if (selectedDate <= now) {
+      return new Response(JSON.stringify({ message: 'A data e horário do evento devem ser no futuro.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -89,9 +90,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Validar status DRAFT
-    if (event.status !== 'DRAFT') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas eventos com status "Aguardando Aprovação" (DRAFT) podem ser editados.' }), {
+    // Validar status DRAFT ou REJECTED
+    if (event.status !== 'DRAFT' && event.status !== 'REJECTED') {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Eventos aprovados não podem ser editados.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -143,6 +144,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
           trailerUrl: trailerUrl || null,
           contractText: contractText || null,
           contractPdf: contractPdf || null,
+          status: 'DRAFT', // Reseta o status para rascunho
+          rejectionReason: null, // Limpa o motivo da rejeição
+          rejectedAt: null, // Limpa a data de rejeição
           categories: {
             create: categories.map((cat: any) => ({
               name: cat.name,
@@ -170,8 +174,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
   } catch (err: any) {
-    console.error('Erro ao editar evento:', err);
-    return new Response(JSON.stringify({ message: err.message || 'Erro interno do servidor.' }), {
+    console.error('Erro na rota:', err);
+    
+    // Tenta salvar o log de forma segura
+    try {
+      const errorData = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      // Garante que prisma está instanciado no escopo
+      if (typeof prisma !== 'undefined') {
+        await prisma.systemLog.create({
+          data: {
+            source: 'BACKEND',
+            errorData: errorData,
+          }
+        });
+      }
+    } catch (logErr) {
+      console.error('Erro ao salvar log no banco:', logErr);
+    }
+    
+    // Filtro de segurança para não expor detalhes de banco ao cliente
+    const isPrismaError = err.clientVersion || err.code || err.meta;
+    const isSupabaseError = err.__isStorageError || err.status === 400 || err.status === 403;
+    const clientMessage = (isPrismaError || isSupabaseError) 
+      ? 'Ocorreu um erro interno no servidor ao processar sua requisição.' 
+      : (err.message || 'Erro interno do servidor.');
+
+    return new Response(JSON.stringify({ message: clientMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

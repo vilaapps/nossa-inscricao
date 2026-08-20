@@ -8,7 +8,10 @@ const url = new URL(Astro.request.url);
 const currentFilter = url.searchParams.get('type') || 'TODOS';
 
 // Filtro condicional
-const whereClause: any = { status: 'PUBLISHED' };
+const whereClause: any = { 
+  status: 'PUBLISHED',
+  date: { gt: new Date() } // Oculta eventos que já passaram
+};
 if (currentFilter !== 'TODOS') {
   whereClause.eventType = currentFilter;
 }

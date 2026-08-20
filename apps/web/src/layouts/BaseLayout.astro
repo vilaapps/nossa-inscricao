@@ -1,6 +1,7 @@
 ---
 import { UserButton, SignInButton } from '@clerk/astro/components';
 import { PrismaClient } from '@prisma/client';
+import CyberDialog from '../components/CyberDialog.astro';
 
 interface Props {
   title: string;
@@ -129,6 +130,7 @@ if (userId) {
         </div>
       </div>
     </footer>
+    <CyberDialog />
   </body>
 </html>
 

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { marked } from "marked";
 import { uploadFileToSupabase } from "../../lib/upload-helper";
 
 interface CategoryField {
@@ -96,10 +97,11 @@ export default function EditEventForm({ event }: EditEventFormProps) {
     })),
   );
 
-  // Estados de Envio
+  // Estados de Envio e Preview
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
 
   const handleSuggestContract = () => {
     setContractText(`CONTRATO E REGULAMENTO PADRÃO DE INSCRIÇÃO EM EVENTOS
@@ -117,12 +119,12 @@ O cancelamento da inscrição obedecerá aos prazos e condições definidas em l
 O participante cede gratuitamente os direitos de uso de sua imagem (fotos e vídeos capturados durante o evento) para fins de divulgação e publicidade do evento e da plataforma organizadora.`);
   };
 
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.type !== "application/pdf") {
-      alert("Por favor, selecione um arquivo no formato PDF.");
+      await (window as any).cyberAlert("Por favor, selecione um arquivo no formato PDF.");
       e.target.value = "";
       return;
     }
@@ -259,6 +261,16 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
     } catch (err: any) {
       setErrorMessage(err.message || "Ocorreu um erro ao salvar o evento.");
       setIsSubmitting(false);
+
+      fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: err.message,
+          stack: err.stack,
+          form: 'EditEventForm'
+        })
+      }).catch(() => {});
     }
   };
 
@@ -285,18 +297,6 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         </div>
       )}
 
-      {errorMessage && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase">
-          ✕ {errorMessage}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
-          {successMessage}
-        </div>
-      )}
 
       {/* DADOS PRINCIPAIS DO EVENTO */}
       <div className="space-y-4 font-mono text-xs text-zinc-400 mb-8">
@@ -575,29 +575,46 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
           {contractType === "TEXT" && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <label
                   htmlFor="contractText"
-                  className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400"
+                  className="text-[10px] font-mono uppercase tracking-wider text-zinc-400"
                 >
                   Texto do Regulamento
                 </label>
-                <button
-                  type="button"
-                  onClick={handleSuggestContract}
-                  className="text-[9px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer font-bold"
-                >
-                  Sugerir Contrato Padrão
-                </button>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
+                    className="text-[9px] font-mono text-zinc-400 hover:text-white uppercase tracking-wider cursor-pointer border border-zinc-800 px-2 py-1"
+                  >
+                    {showMarkdownPreview ? "Editar Texto" : "Preview Markdown"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSuggestContract}
+                    className="text-[9px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer font-bold"
+                  >
+                    Sugerir Contrato Padrão
+                  </button>
+                </div>
               </div>
-              <textarea
-                id="contractText"
-                rows={6}
-                placeholder="Insira os termos de responsabilidade do evento, regras gerais, políticas de reembolso..."
-                value={contractText}
-                onChange={(e) => setContractText(e.target.value)}
-                className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs font-mono placeholder:text-zinc-700"
-              />
+              
+              {showMarkdownPreview ? (
+                <div 
+                  className="w-full bg-[#0d0e12] border border-zinc-800 p-4 max-h-64 overflow-y-auto text-zinc-300 text-xs font-sans markdown-body"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(contractText || 'Nenhum texto inserido.') }}
+                />
+              ) : (
+                <textarea
+                  id="contractText"
+                  rows={6}
+                  placeholder="Insira os termos de responsabilidade do evento, regras gerais, políticas de reembolso..."
+                  value={contractText}
+                  onChange={(e) => setContractText(e.target.value)}
+                  className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs font-mono placeholder:text-zinc-700"
+                />
+              )}
             </div>
           )}
 
@@ -774,6 +791,19 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           ))}
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase">
+          ✕ {errorMessage}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+          {successMessage}
+        </div>
+      )}
 
       <div className="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
         <a

@@ -252,6 +252,71 @@ events.forEach(event => {
       )}
     </div>
 
+    <!-- Todos os Eventos da Plataforma -->
+    <div class="space-y-6">
+      <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
+        Todos os Eventos da Plataforma
+      </h3>
+
+      {events.length === 0 ? (
+        <div class="bg-[#15171f] border border-zinc-800 p-8 text-center text-zinc-500 uppercase">
+          Nenhum evento na plataforma.
+        </div>
+      ) : (
+        <div class="border border-zinc-800 overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+                <th class="p-4">Evento</th>
+                <th class="p-4">Status</th>
+                <th class="p-4 text-center">Inscrições</th>
+                <th class="p-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+              {events.map((event) => {
+                const hasRegistrations = event.registrations.some((r: any) => r.status === 'CONFIRMED' || r.paymentStatus === 'PAID');
+                
+                return (
+                  <tr class="hover:bg-[#1a1c25] transition-colors">
+                    <td class="p-4 font-bold text-zinc-200 uppercase">{event.title}</td>
+                    <td class="p-4 text-zinc-400 font-mono text-[10px]">{event.status}</td>
+                    <td class="p-4 text-center text-zinc-300">
+                      {event.registrations.length}
+                    </td>
+                    <td class="p-4 text-center">
+                      <div class="flex items-center justify-center gap-2">
+                        <a
+                          href={`/admin/eventos/${event.id}`}
+                          class="border border-zinc-800 hover:border-zinc-700 text-blue-400 hover:text-blue-300 text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors"
+                        >
+                          Ver
+                        </a>
+                        <button
+                          onclick={`arquivarEventoGlobal('${event.id}')`}
+                          class="border border-amber-500/30 text-amber-500 hover:bg-amber-500/10 text-[10px] uppercase px-3 py-1 font-extrabold tracking-wider transition-colors cursor-pointer"
+                        >
+                          Arquivar
+                        </button>
+                        {!hasRegistrations && (
+                          <button
+                            onclick={`excluirEventoGlobal('${event.id}')`}
+                            class="bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 text-[10px] uppercase px-3 py-1 font-extrabold tracking-wider transition-colors cursor-pointer"
+                          >
+                            Excluir
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+
     <!-- Configuração de Tenants e Comissões -->
     <div class="space-y-6">
       <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
@@ -308,7 +373,7 @@ events.forEach(event => {
   <!-- Scripts de Ação do Administrador -->
   <script is:inline>
     async function aprovarEvento(eventId) {
-      if (!confirm('Deseja realmente aprovar este evento para publicação?')) return;
+      if (!await window.cyberConfirm('Deseja realmente aprovar este evento para publicação?')) return;
       
       try {
         const response = await fetch('/api/admin/eventos/aprovar', {
@@ -325,15 +390,15 @@ events.forEach(event => {
           throw new Error(data.message || 'Erro ao aprovar evento.');
         }
 
-        alert('Evento aprovado com sucesso!');
+        await window.cyberAlert('Evento aprovado com sucesso!');
         window.location.reload();
       } catch (err) {
-        alert(err.message);
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
       }
     }
 
     async function reprovarEvento(eventId) {
-      const reason = prompt('Qual o motivo da reprovação? (O organizador verá esta mensagem)');
+      const reason = await window.cyberPrompt('Qual o motivo da reprovação? (O organizador verá esta mensagem)');
       if (!reason) return;
       
       try {
@@ -351,10 +416,10 @@ events.forEach(event => {
           throw new Error(data.message || 'Erro ao reprovar evento.');
         }
 
-        alert('Evento reprovado!');
+        await window.cyberAlert('Evento reprovado!');
         window.location.reload();
       } catch (err) {
-        alert(err.message);
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
       }
     }
 
@@ -363,7 +428,7 @@ events.forEach(event => {
       const rate = parseFloat(input.value);
 
       if (isNaN(rate) || rate < 0 || rate > 100) {
-        alert('Por favor, informe uma taxa válida entre 0 e 100.');
+        await window.cyberAlert('Por favor, informe uma taxa válida entre 0 e 100.');
         return;
       }
 
@@ -382,9 +447,41 @@ events.forEach(event => {
           throw new Error(data.message || 'Erro ao atualizar a comissão.');
         }
 
-        alert('Taxa de comissão atualizada com sucesso!');
+        await window.cyberAlert('Taxa de comissão atualizada com sucesso!');
       } catch (err) {
-        alert(err.message);
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
+      }
+    async function arquivarEventoGlobal(eventId) {
+      if (!await window.cyberConfirm('Deseja realmente arquivar este evento?')) return;
+      try {
+        const response = await fetch('/api/admin/eventos/arquivar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Erro ao arquivar evento.');
+        await window.cyberAlert('Evento arquivado com sucesso!');
+        window.location.reload();
+      } catch (err) {
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
+      }
+    }
+
+    async function excluirEventoGlobal(eventId) {
+      if (!await window.cyberConfirm('Deseja realmente excluir DE FORMA DEFINITIVA este evento? Esta ação não pode ser desfeita.', 'PERIGO_DESTRUIÇÃO', 'error')) return;
+      try {
+        const response = await fetch('/api/admin/eventos/excluir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Erro ao excluir evento.');
+        await window.cyberAlert('Evento excluído permanentemente!');
+        window.location.reload();
+      } catch (err) {
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
       }
     }
   </script>

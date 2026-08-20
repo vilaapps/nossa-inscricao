@@ -511,12 +511,20 @@ const barGraphHeight = 160;
                   </td>
                   <td class="p-4 text-center">
                     <div class="flex items-center justify-center gap-2">
-                      {item.status === 'DRAFT' && (
+                      {(item.status === 'DRAFT' || item.status === 'REJECTED') && (
                         <a
                           href={`/painel-organizador/eventos/editar?id=${item.id}`}
                           class="border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-[10px] px-3 py-1.5 uppercase font-bold tracking-wider transition-colors"
                         >
                           Editar
+                        </a>
+                      )}
+                      {(item.status === 'PUBLISHED' || item.status === 'ARCHIVED') && (
+                        <a
+                          href={`/painel-organizador/eventos/visualizar?id=${item.id}`}
+                          class="border border-zinc-800 hover:border-zinc-700 text-blue-400 hover:text-blue-300 text-[10px] px-3 py-1.5 uppercase font-bold tracking-wider transition-colors"
+                        >
+                          Ver
                         </a>
                       )}
                       {item.status === 'REJECTED' && (
@@ -548,7 +556,7 @@ const barGraphHeight = 160;
 
   <script is:inline>
     async function excluirEvento(eventId) {
-      if (!confirm('Deseja realmente excluir este evento permanentemente? Esta ação não pode ser desfeita.')) {
+      if (!await window.cyberConfirm('Deseja realmente excluir este evento permanentemente? Esta ação não pode ser desfeita.')) {
         return;
       }
 
@@ -575,15 +583,15 @@ const barGraphHeight = 160;
           throw new Error(data.message || 'Erro ao excluir o evento.');
         }
 
-        alert('Evento excluído com sucesso!');
+        await window.cyberAlert('Evento excluído com sucesso!');
         window.location.reload();
       } catch (err) {
-        alert(err.message);
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
       }
     }
 
     async function arquivarEvento(eventId) {
-      if (!confirm('Deseja realmente arquivar este evento? Ele será ocultado.')) {
+      if (!await window.cyberConfirm('Deseja realmente arquivar este evento? Ele será ocultado.')) {
         return;
       }
 
@@ -610,10 +618,10 @@ const barGraphHeight = 160;
           throw new Error(data.message || 'Erro ao arquivar o evento.');
         }
 
-        alert('Evento arquivado com sucesso!');
+        await window.cyberAlert('Evento arquivado com sucesso!');
         window.location.reload();
       } catch (err) {
-        alert(err.message);
+        await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
       }
     }
   </script>

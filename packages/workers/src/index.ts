@@ -25,24 +25,30 @@ async function bootstrap(): Promise<void> {
   );
   console.log('⏰ Scheduled repeatable job: cleanup-expired-registrations (every 2 minutes)');
 
-  // Instancia cada um dos 4 Workers associados às filas do BullMQ
-  const registrationWorker = new Worker(QueueName.REGISTRATION, processRegistration, {
+  // Configuração base otimizada para reduzir comandos no Redis (Upstash)
+  const baseWorkerOptions = {
     connection: redisConnection,
+    // Aumenta o tempo de checagem de jobs travados de 30s para 5 minutos
+    stalledInterval: 300000, 
+  };
+
+  const registrationWorker = new Worker(QueueName.REGISTRATION, processRegistration, {
+    ...baseWorkerOptions,
     concurrency: 10,
   });
 
   const paymentWorker = new Worker(QueueName.PAYMENT, processPayment, {
-    connection: redisConnection,
+    ...baseWorkerOptions,
     concurrency: 5,
   });
 
   const webhookWorker = new Worker(QueueName.WEBHOOK, processWebhook, {
-    connection: redisConnection,
+    ...baseWorkerOptions,
     concurrency: 5,
   });
 
   const emailWorker = new Worker(QueueName.EMAIL, processEmail, {
-    connection: redisConnection,
+    ...baseWorkerOptions,
     concurrency: 5,
   });
 
