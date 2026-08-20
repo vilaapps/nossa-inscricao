@@ -28,7 +28,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const body = await request.json();
     
-    const { eventId, title, description, date, availableSlots, categories, batches, contractText, contractPdf } = body;
+    const { eventId, title, description, date, availableSlots, eventType, location, locationUrl, bannerUrl, logoUrl, trailerUrl, categories, batches, contractText, contractPdf } = body;
 
     if (!eventId || !title || !date || !availableSlots) {
       return new Response(JSON.stringify({ message: 'ID, título, data e limite de vagas são obrigatórios.' }), {
@@ -37,8 +37,27 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
+    const selectedDate = new Date(date);
+    const now = new Date();
+    
+    // O evento deve acontecer estritamente no futuro, mesmo na edição
+    if (selectedDate <= now) {
+      return new Response(JSON.stringify({ message: 'A data e horário do evento devem ser no futuro.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (!categories || categories.length === 0) {
       return new Response(JSON.stringify({ message: 'O evento precisa ter pelo menos uma categoria cadastrada.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const totalCategorySlots = categories.reduce((sum: number, cat: any) => sum + Number(cat.slots || 0), 0);
+    if (totalCategorySlots > Number(availableSlots)) {
+      return new Response(JSON.stringify({ message: `A soma das vagas das categorias (${totalCategorySlots}) não pode ultrapassar o limite geral do evento (${availableSlots}).` }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -71,9 +90,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Validar status DRAFT
-    if (event.status !== 'DRAFT') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas eventos com status "Aguardando Aprovação" (DRAFT) podem ser editados.' }), {
+    // Validar status DRAFT ou REJECTED
+    if (event.status !== 'DRAFT' && event.status !== 'REJECTED') {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Eventos aprovados não podem ser editados.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -117,8 +136,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
           description: description || '',
           date: new Date(date),
           availableSlots: Number(availableSlots),
+          eventType: eventType || 'CORRIDA',
+          location: location || null,
+          locationUrl: locationUrl || null,
+          bannerUrl: bannerUrl || null,
+          logoUrl: logoUrl || null,
+          trailerUrl: trailerUrl || null,
           contractText: contractText || null,
           contractPdf: contractPdf || null,
+          status: 'DRAFT', // Reseta o status para rascunho
+          rejectionReason: null, // Limpa o motivo da rejeição
+          rejectedAt: null, // Limpa a data de rejeição
           categories: {
             create: categories.map((cat: any) => ({
               name: cat.name,
@@ -146,8 +174,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
   } catch (err: any) {
-    console.error('Erro ao editar evento:', err);
-    return new Response(JSON.stringify({ message: err.message || 'Erro interno do servidor.' }), {
+    console.error('Erro na rota:', err);
+    
+    // Tenta salvar o log de forma segura
+    try {
+      const errorData = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      // Garante que prisma está instanciado no escopo
+      if (typeof prisma !== 'undefined') {
+        await prisma.systemLog.create({
+          data: {
+            source: 'BACKEND',
+            errorData: errorData,
+          }
+        });
+      }
+    } catch (logErr) {
+      console.error('Erro ao salvar log no banco:', logErr);
+    }
+    
+    // Filtro de segurança para não expor detalhes de banco ao cliente
+    const isPrismaError = err.clientVersion || err.code || err.meta;
+    const isSupabaseError = err.__isStorageError || err.status === 400 || err.status === 403;
+    const clientMessage = (isPrismaError || isSupabaseError) 
+      ? 'Ocorreu um erro interno no servidor ao processar sua requisição.' 
+      : (err.message || 'Erro interno do servidor.');
+
+    return new Response(JSON.stringify({ message: clientMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

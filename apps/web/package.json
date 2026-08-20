@@ -18,16 +18,20 @@
     "@astrojs/vercel": "^10.0.0",
     "@clerk/astro": "^3.3.3",
     "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.112.3",
     "@syncflow/shared": "*",
     "astro": "^6.4.4",
+    "marked": "^18.0.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/marked": "^5.0.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.9.2"
   }
 }

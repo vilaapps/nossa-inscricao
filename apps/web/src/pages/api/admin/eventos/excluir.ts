@@ -38,9 +38,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // 3. Buscar o evento para validar permissão e status
+    // 3. Buscar o evento com inscrições para validar permissão e status
     const event = await prisma.event.findUnique({
       where: { id: eventId },
+      include: {
+        registrations: {
+          where: {
+            OR: [
+              { status: 'CONFIRMED' },
+              { paymentStatus: 'PAID' },
+            ]
+          }
+        }
+      }
     });
 
     if (!event) {
@@ -58,9 +68,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Só é possível excluir se o status for DRAFT
-    if (event.status !== 'DRAFT') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas eventos com status "Aguardando Aprovação" (DRAFT) podem ser excluídos.' }), {
+    // Validar status permitidos para exclusão
+    const isDraft = event.status === 'DRAFT';
+    const isRejected = event.status === 'REJECTED';
+    const isPublishedWithoutRegistrations = event.status === 'PUBLISHED' && event.registrations.length === 0;
+
+    if (!isDraft && !isRejected && !isPublishedWithoutRegistrations) {
+      return new Response(JSON.stringify({ 
+        message: 'Acesso negado. Apenas rascunhos, eventos rejeitados ou eventos publicados sem nenhuma inscrição paga podem ser excluídos.' 
+      }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -77,8 +93,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
   } catch (err: any) {
-    console.error('Erro ao excluir evento:', err);
-    return new Response(JSON.stringify({ message: err.message || 'Erro interno do servidor.' }), {
+    console.error('Erro na rota:', err);
+    
+    // Tenta salvar o log de forma segura
+    try {
+      const errorData = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      // Garante que prisma está instanciado no escopo
+      if (typeof prisma !== 'undefined') {
+        await prisma.systemLog.create({
+          data: {
+            source: 'BACKEND',
+            errorData: errorData,
+          }
+        });
+      }
+    } catch (logErr) {
+      console.error('Erro ao salvar log no banco:', logErr);
+    }
+    
+    // Filtro de segurança para não expor detalhes de banco ao cliente
+    const isPrismaError = err.clientVersion || err.code || err.meta;
+    const isSupabaseError = err.__isStorageError || err.status === 400 || err.status === 403;
+    const clientMessage = (isPrismaError || isSupabaseError) 
+      ? 'Ocorreu um erro interno no servidor ao processar sua requisição.' 
+      : (err.message || 'Erro interno do servidor.');
+
+    return new Response(JSON.stringify({ message: clientMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

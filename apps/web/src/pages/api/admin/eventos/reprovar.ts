@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
     if (!user || user.role !== 'ADMIN') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas administradores podem alterar comissões.' }), {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas administradores podem reprovar eventos.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -29,32 +29,45 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // 2. Extrair dados da requisição
     const body = await request.json();
-    const { tenantId, commissionRate } = body;
+    const { eventId, reason } = body;
 
-    if (!tenantId || commissionRate === undefined) {
-      return new Response(JSON.stringify({ message: 'tenantId e commissionRate são obrigatórios.' }), {
+    if (!eventId || !reason) {
+      return new Response(JSON.stringify({ message: 'eventId e reason (motivo) são obrigatórios.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const rate = parseFloat(commissionRate);
-    if (isNaN(rate) || rate < 0 || rate > 100) {
-      return new Response(JSON.stringify({ message: 'A taxa de comissão deve ser um número entre 0 e 100.' }), {
+    // 3. Buscar o evento para validar status atual
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      return new Response(JSON.stringify({ message: 'Evento não encontrado.' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (event.status !== 'DRAFT') {
+      return new Response(JSON.stringify({ message: 'Apenas eventos em rascunho (DRAFT) podem ser reprovados.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // 3. Atualizar a comissão do Tenant no banco de dados
-    const updatedTenant = await prisma.tenant.update({
-      where: { id: tenantId },
+    // 4. Atualizar o status do Evento para REJECTED no banco de dados
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
       data: {
-        commissionRate: rate,
+        status: 'REJECTED',
+        rejectionReason: reason,
+        rejectedAt: new Date()
       },
     });
 
-    return new Response(JSON.stringify({ success: true, tenantId: updatedTenant.id, commissionRate: Number(updatedTenant.commissionRate) }), {
+    return new Response(JSON.stringify({ success: true, eventId: updatedEvent.id, status: updatedEvent.status }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

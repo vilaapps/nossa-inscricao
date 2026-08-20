@@ -172,6 +172,26 @@ export class AsaasService {
       throw new Error(`Failed to delete Asaas payment: ${response.statusText} - ${errorText}`);
     }
   }
+
+  // Estorna um pagamento já efetuado
+  async refundPayment(paymentId: string, value?: number, description?: string, customApiKey?: string): Promise<any> {
+    const body: any = {};
+    if (value) body.value = value;
+    if (description) body.description = description;
+
+    const response = await fetch(`${this.baseUrl}/payments/${paymentId}/refund`, {
+      method: 'POST',
+      headers: this.getHeaders(customApiKey),
+      body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to refund Asaas payment: ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
+  }
 }
 
 export const asaasService = new AsaasService();

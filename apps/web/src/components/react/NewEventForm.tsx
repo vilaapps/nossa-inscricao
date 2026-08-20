@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { marked } from "marked";
+import { uploadFileToSupabase } from "../../lib/upload-helper";
 
 interface CategoryField {
   name: string;
@@ -12,15 +14,30 @@ interface BatchField {
 }
 
 export default function NewEventForm() {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [date, setDate] = useState('');
-  const [availableSlots, setAvailableSlots] = useState(100);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<number>(100);
+
+  // Caso 4: Modalidade do evento
+  const [eventType, setEventType] = useState("CORRIDA");
+
+  // Caso 2: Localização e Google Maps
+  const [location, setLocation] = useState("");
+  const [locationUrl, setLocationUrl] = useState("");
+
+  // Caso 3: Mídias (Banner, Logo, Trailer)
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [trailerUrl, setTrailerUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
   // Estados do Contrato
-  const [contractType, setContractType] = useState<'TEXT' | 'PDF'>('TEXT');
-  const [contractText, setContractText] = useState('');
-  const [contractPdf, setContractPdf] = useState<string | null>(null);
+  const [contractType, setContractType] = useState<"TEXT" | "PDF">("TEXT");
+  const [contractText, setContractText] = useState("");
+  const [contractFile, setContractFile] = useState<File | null>(null);
 
   const handleSuggestContract = () => {
     setContractText(`CONTRATO E REGULAMENTO PADRÃO DE INSCRIÇÃO EM EVENTOS
@@ -38,41 +55,38 @@ O cancelamento da inscrição obedecerá aos prazos e condições definidas em l
 O participante cede gratuitamente os direitos de uso de sua imagem (fotos e vídeos capturados durante o evento) para fins de divulgação e publicidade do evento e da plataforma organizadora.`);
   };
 
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      alert('Por favor, selecione um arquivo no formato PDF.');
-      e.target.value = '';
+    if (file.type !== "application/pdf") {
+      await (window as any).cyberAlert("Por favor, selecione um arquivo no formato PDF.");
+      e.target.value = "";
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setContractPdf(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setContractFile(file);
   };
 
   // Categorias Dinâmicas (inicia com 1 default)
   const [categories, setCategories] = useState<CategoryField[]>([
-    { name: 'Geral Misto', gender: 'OPEN', slots: 100 }
+    { name: "Geral Misto", gender: "OPEN", slots: 100 },
   ]);
 
   // Lotes Dinâmicos (inicia com 1 default)
   const [batches, setBatches] = useState<BatchField[]>([
-    { name: '1º Lote', price: '99.90' }
+    { name: "1º Lote", price: "99.90" },
   ]);
 
   // Estados de Envio
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
 
   // Adicionar/Remover Categoria
   const addCategory = () => {
-    setCategories([...categories, { name: '', gender: 'OPEN', slots: 50 }]);
+    setCategories([...categories, { name: "", gender: "OPEN", slots: 50 }]);
   };
 
   const removeCategory = (index: number) => {
@@ -80,7 +94,11 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
     setCategories(categories.filter((_, i) => i !== index));
   };
 
-  const updateCategory = (index: number, key: keyof CategoryField, value: any) => {
+  const updateCategory = (
+    index: number,
+    key: keyof CategoryField,
+    value: any,
+  ) => {
     const updated = [...categories];
     updated[index] = { ...updated[index], [key]: value };
     setCategories(updated);
@@ -88,7 +106,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
   // Adicionar/Remover Lote
   const addBatch = () => {
-    setBatches([...batches, { name: '', price: '' }]);
+    setBatches([...batches, { name: "", price: "" }]);
   };
 
   const removeBatch = (index: number) => {
@@ -105,84 +123,140 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
   // Enviar formulário
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Front-end validations
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      setErrorMessage("A data do evento não pode ser retroativa.");
+      return;
+    }
+
+    const totalCategorySlots = categories.reduce((sum, cat) => sum + Number(cat.slots || 0), 0);
+    if (totalCategorySlots > availableSlots) {
+      setErrorMessage(`A soma das vagas das categorias (${totalCategorySlots}) não pode ultrapassar o limite geral do evento (${availableSlots}).`);
+      return;
+    }
+
     setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
+    setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       // Obter token JWT do Clerk
       const clerk = (window as any).Clerk;
       if (!clerk || !clerk.session) {
-        throw new Error('Sessão expirada. Faça login novamente.');
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const token = await clerk.session.getToken();
+
+      setIsUploading(true);
+      let finalBannerUrl = bannerUrl;
+      let finalLogoUrl = logoUrl;
+      let finalContractPdf = contractFile ? "" : null;
+
+      if (bannerFile) {
+        finalBannerUrl = await uploadFileToSupabase(bannerFile, "banners");
+      }
+      if (logoFile) {
+        finalLogoUrl = await uploadFileToSupabase(logoFile, "logos");
+      }
+      if (contractFile && contractType === "PDF") {
+        finalContractPdf = await uploadFileToSupabase(contractFile, "general");
+      }
+      setIsUploading(false);
 
       const payload = {
         title,
         description,
         date,
         availableSlots: Number(availableSlots),
+        eventType,
+        location,
+        locationUrl,
+        bannerUrl: finalBannerUrl,
+        logoUrl: finalLogoUrl,
+        trailerUrl,
         categories,
-        batches: batches.map(b => ({
+        batches: batches.map((b) => ({
           name: b.name,
-          price: Number(b.price) || 0
+          price: Number(b.price) || 0,
         })),
-        contractText: contractType === 'TEXT' ? contractText : null,
-        contractPdf: contractType === 'PDF' ? contractPdf : null
+        contractText: contractType === "TEXT" ? contractText : null,
+        contractPdf: contractType === "PDF" ? finalContractPdf : null,
       };
 
-      const response = await fetch('/api/eventos', {
-        method: 'POST',
+      const response = await fetch("/api/eventos", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({ message: 'Erro desconhecido.' }));
-        throw new Error(errData.message || 'Falha ao criar evento.');
+        const errData = await response
+          .json()
+          .catch(() => ({ message: "Erro desconhecido." }));
+        throw new Error(errData.message || "Falha ao criar evento.");
       }
 
-      setSuccessMessage('Competição criada com sucesso! Redirecionando...');
+      setSuccessMessage("Competição criada com sucesso! Redirecionando...");
 
       setTimeout(() => {
-        window.location.href = '/admin/dashboard';
+        window.location.href = "/painel-organizador";
       }, 1500);
-
     } catch (err: any) {
-      setErrorMessage(err.message || 'Ocorreu um erro ao salvar o evento.');
+      setErrorMessage(err.message || "Ocorreu um erro ao salvar o evento.");
       setIsSubmitting(false);
+      
+      fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: err.message,
+          stack: err.stack,
+          form: 'NewEventForm'
+        })
+      }).catch(() => {});
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} class="w-full bg-[#15171f] border border-zinc-800 p-6 md:p-8 relative">
-      <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+    <form
+      onSubmit={handleSubmit}
+      className="w-full bg-[#15171f] border border-zinc-800 p-6 md:p-8 relative"
+    >
+      <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
 
-      <div class="mb-6">
-        <h2 class="font-heading text-xl font-bold text-white uppercase tracking-wider">Novo Evento</h2>
-        <p class="text-zinc-500 text-xs mt-1 font-mono uppercase">Cadastre as informações da prova esportiva.</p>
+      <div className="mb-6">
+        <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">
+          Novo Evento
+        </h2>
+        <p className="text-zinc-500 text-xs mt-1 font-mono uppercase">
+          Cadastre as informações da prova esportiva.
+        </p>
       </div>
 
-      {errorMessage && (
-        <div class="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase">
-          ✕ {errorMessage}
+      {isUploading && (
+        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+          <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent animate-spin rounded-full inline-block"></span>
+          Fazendo upload de arquivo...
         </div>
       )}
 
-      {successMessage && (
-        <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
-          <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
-          {successMessage}
-        </div>
-      )}
 
       {/* DADOS PRINCIPAIS DO EVENTO */}
-      <div class="space-y-4 font-mono text-xs text-zinc-400 mb-8">
-        <div class="space-y-2">
-          <label htmlFor="title" class="text-[10px] uppercase block tracking-wider">Título Oficial do Evento</label>
+      <div className="space-y-4 font-mono text-xs text-zinc-400 mb-8">
+        <div className="space-y-2">
+          <label
+            htmlFor="title"
+            className="text-[10px] uppercase block tracking-wider"
+          >
+            Título Oficial do Evento
+          </label>
           <input
             type="text"
             id="title"
@@ -190,114 +264,324 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             placeholder="EX: 10K RIO DE JANEIRO CORRIDA"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
           />
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <label htmlFor="date" class="text-[10px] uppercase block tracking-wider">Data & Horário do Evento</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label
+              htmlFor="date"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Data & Horário do Evento
+            </label>
             <input
               type="datetime-local"
               id="date"
               required
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
 
-          <div class="space-y-2">
-            <label htmlFor="slots" class="text-[10px] uppercase block tracking-wider">Limite Físico Geral de Vagas</label>
+          <div className="space-y-2">
+            <label
+              htmlFor="eventType"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Modalidade do Evento
+            </label>
+            <select
+              id="eventType"
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase appearance-none"
+            >
+              <option value="CORRIDA">Corrida de Rua</option>
+              <option value="ULTRA_TRAIL">Ultra Trail / Trilha</option>
+              <option value="CICLISMO">Ciclismo</option>
+              <option value="MOUNTAIN_BIKE">Mountain Bike</option>
+              <option value="TRIATHLON">Triathlon</option>
+              <option value="DUATHLON">Duathlon</option>
+              <option value="AVENTURA">Corrida de Aventura</option>
+              <option value="OUTRO">Outra Modalidade</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="slots"
+            className="text-[10px] uppercase block tracking-wider"
+          >
+            Limite Físico Geral de Vagas
+          </label>
+          <input
+            type="number"
+            id="slots"
+            required
+            min="1"
+            value={availableSlots}
+            onChange={(e) => setAvailableSlots(Number(e.target.value))}
+            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label
+              htmlFor="location"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Endereço (Texto)
+            </label>
             <input
-              type="number"
-              id="slots"
-              required
-              min="1"
-              value={availableSlots}
-              onChange={(e) => setAvailableSlots(Number(e.target.value))}
-              class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+              type="text"
+              id="location"
+              placeholder="EX: PRAÇA PRINCIPAL, CENTRO"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="locationUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Link Iframe Google Maps
+            </label>
+            <input
+              type="text"
+              id="locationUrl"
+              placeholder="https://www.google.com/maps/embed?pb=..."
+              value={locationUrl}
+              onChange={(e) => setLocationUrl(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
             />
           </div>
         </div>
 
-        <div class="space-y-2 font-sans">
-          <label htmlFor="desc" class="text-[10px] font-mono uppercase block tracking-wider text-zinc-400">Regulamento / Informações Básicas</label>
+        {/* MÍDIAS DO EVENTO (CASO 3) */}
+        <div className="space-y-4 pt-6 border-t border-zinc-800/60">
+          <h3 className="font-heading text-lg font-bold text-white uppercase tracking-wider">
+            Mídia e Identidade Visual
+          </h3>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="bannerUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Banner Principal (URL ou Upload)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="bannerUrl"
+                placeholder="https://..."
+                value={bannerUrl}
+                onChange={(e) => setBannerUrl(e.target.value)}
+                className="flex-grow bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+              />
+              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
+                Selecionar
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setBannerFile(file);
+                      setBannerUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {bannerUrl && (
+              <img
+                src={bannerUrl}
+                alt="Preview Banner"
+                className="h-24 w-auto object-cover border border-zinc-800 mt-2"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="logoUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Logo da Organização (URL ou Upload)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                id="logoUrl"
+                placeholder="https://..."
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                className="flex-grow bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+              />
+              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
+                Selecionar
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setLogoFile(file);
+                      setLogoUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt="Preview Logo"
+                className="h-16 w-16 object-cover border border-zinc-800 mt-2 rounded-full"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="trailerUrl"
+              className="text-[10px] uppercase block tracking-wider"
+            >
+              Trailer / Vídeo Promocional (YouTube Embed URL)
+            </label>
+            <input
+              type="text"
+              id="trailerUrl"
+              placeholder="https://www.youtube.com/embed/..."
+              value={trailerUrl}
+              onChange={(e) => setTrailerUrl(e.target.value)}
+              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2 font-sans pt-6 border-t border-zinc-800/60">
+          <label
+            htmlFor="desc"
+            className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400"
+          >
+            Regulamento / Informações Básicas
+          </label>
           <textarea
             id="desc"
             rows={4}
             placeholder="Insira detalhes sobre regulamento, local da largada, entrega de kits, premiação..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs placeholder:text-zinc-700"
+            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs placeholder:text-zinc-700"
           />
         </div>
 
         {/* CONTRATO / REGULAMENTO */}
-        <div class="space-y-4 mb-8 border-t border-zinc-800/60 pt-6 font-sans">
+        <div className="space-y-4 mb-8 border-t border-zinc-800/60 pt-6 font-sans">
           <div>
-            <h3 class="font-heading text-xs font-bold text-white uppercase tracking-wider">Contrato / Regulamento Oficial</h3>
-            <p class="text-zinc-500 text-[10px] mt-1 font-mono uppercase">Escolha o formato do contrato. Se ambos forem deixados em branco, o contrato padrão será exibido.</p>
+            <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+              Contrato / Regulamento Oficial
+            </h3>
+            <p className="text-zinc-500 text-[10px] mt-1 font-mono uppercase">
+              Escolha o formato do contrato. Se ambos forem deixados em branco,
+              o contrato padrão será exibido.
+            </p>
           </div>
 
-          <div class="flex gap-4 font-mono text-xs mb-4">
-            <label class="flex items-center gap-2 cursor-pointer text-zinc-300">
+          <div className="flex gap-4 font-mono text-xs mb-4">
+            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
               <input
                 type="radio"
                 name="contractType"
-                checked={contractType === 'TEXT'}
-                onChange={() => setContractType('TEXT')}
-                class="accent-emerald-500"
+                checked={contractType === "TEXT"}
+                onChange={() => setContractType("TEXT")}
+                className="accent-emerald-500"
               />
               Texto / Markdown
             </label>
-            <label class="flex items-center gap-2 cursor-pointer text-zinc-300">
+            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
               <input
                 type="radio"
                 name="contractType"
-                checked={contractType === 'PDF'}
-                onChange={() => setContractType('PDF')}
-                class="accent-emerald-500"
+                checked={contractType === "PDF"}
+                onChange={() => setContractType("PDF")}
+                className="accent-emerald-500"
               />
               Upload de PDF
             </label>
           </div>
 
-          {contractType === 'TEXT' && (
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <label htmlFor="contractText" class="text-[10px] font-mono uppercase block tracking-wider text-zinc-400">Texto do Regulamento</label>
-                <button
-                  type="button"
-                  onClick={handleSuggestContract}
-                  class="text-[9px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer font-bold"
+          {contractType === "TEXT" && (
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label
+                  htmlFor="contractText"
+                  className="text-[10px] font-mono uppercase tracking-wider text-zinc-400"
                 >
-                  Sugerir Contrato Padrão
-                </button>
+                  Texto do Regulamento
+                </label>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
+                    className="text-[9px] font-mono text-zinc-400 hover:text-white uppercase tracking-wider cursor-pointer border border-zinc-800 px-2 py-1"
+                  >
+                    {showMarkdownPreview ? "Editar Texto" : "Preview Markdown"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSuggestContract}
+                    className="text-[9px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer font-bold"
+                  >
+                    Sugerir Contrato Padrão
+                  </button>
+                </div>
               </div>
-              <textarea
-                id="contractText"
-                rows={6}
-                placeholder="Insira os termos de responsabilidade do evento, regras gerais, políticas de reembolso..."
-                value={contractText}
-                onChange={(e) => setContractText(e.target.value)}
-                class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs font-mono placeholder:text-zinc-700"
-              />
+              
+              {showMarkdownPreview ? (
+                <div 
+                  className="w-full bg-[#0d0e12] border border-zinc-800 p-4 max-h-64 overflow-y-auto text-zinc-300 text-xs font-sans markdown-body"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(contractText || 'Nenhum texto inserido.') }}
+                />
+              ) : (
+                <textarea
+                  id="contractText"
+                  rows={6}
+                  placeholder="Insira os termos de responsabilidade do evento, regras gerais, políticas de reembolso..."
+                  value={contractText}
+                  onChange={(e) => setContractText(e.target.value)}
+                  className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs font-mono placeholder:text-zinc-700"
+                />
+              )}
             </div>
           )}
 
-          {contractType === 'PDF' && (
-            <div class="space-y-2 font-mono">
-              <label class="text-[10px] uppercase block tracking-wider text-zinc-400">Arquivo PDF do Regulamento</label>
+          {contractType === "PDF" && (
+            <div className="space-y-2 font-mono">
+              <label className="text-[10px] uppercase block tracking-wider text-zinc-400">
+                Arquivo PDF do Regulamento
+              </label>
               <input
                 type="file"
                 accept="application/pdf"
                 onChange={handlePdfUpload}
-                class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs"
+                className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs"
               />
-              {contractPdf && (
-                <div class="text-[10px] text-emerald-400 uppercase mt-1">
-                  ✓ PDF Carregado com sucesso (Pronto para salvar)
+              {contractFile && (
+                <div className="text-[10px] text-emerald-400 uppercase mt-1">
+                  ✓ PDF Selecionado: {contractFile.name} (Pronto para salvar)
                 </div>
               )}
             </div>
@@ -306,39 +590,52 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       </div>
 
       {/* CATEGORIAS DO EVENTO */}
-      <div class="space-y-4 mb-8">
-        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 class="font-heading text-xs font-bold text-white uppercase tracking-wider">Categorias Oficiais</h3>
+      <div className="space-y-4 mb-8">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+            Categorias Oficiais
+          </h3>
           <button
             type="button"
             onClick={addCategory}
-            class="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-widest cursor-pointer font-bold"
+            className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-widest cursor-pointer font-bold"
           >
             + Adicionar Categoria
           </button>
         </div>
 
-        <div class="space-y-3">
+        <div className="space-y-3">
           {categories.map((cat, index) => (
-            <div key={index} class="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs">
-              <div class="flex-grow space-y-2 w-full">
-                <label class="text-[9px] text-zinc-500 uppercase tracking-wider">Nome da Categoria</label>
+            <div
+              key={index}
+              className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs"
+            >
+              <div className="flex-grow space-y-2 w-full">
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Nome da Categoria
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="EX: ELITE MASCULINO"
                   value={cat.name}
-                  onChange={(e) => updateCategory(index, 'name', e.target.value)}
-                  class="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                  onChange={(e) =>
+                    updateCategory(index, "name", e.target.value)
+                  }
+                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
                 />
               </div>
 
-              <div class="w-full md:w-48 space-y-2">
-                <label class="text-[9px] text-zinc-500 uppercase tracking-wider">Gênero Aceito</label>
+              <div className="w-full md:w-48 space-y-2">
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Gênero Aceito
+                </label>
                 <select
                   value={cat.gender}
-                  onChange={(e) => updateCategory(index, 'gender', e.target.value)}
-                  class="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
+                  onChange={(e) =>
+                    updateCategory(index, "gender", e.target.value)
+                  }
+                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
                 >
                   <option value="OPEN">MISTO / LIVRE</option>
                   <option value="MALE">MASCULINO</option>
@@ -346,15 +643,19 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 </select>
               </div>
 
-              <div class="w-full md:w-36 space-y-2">
-                <label class="text-[9px] text-zinc-500 uppercase tracking-wider">Vagas Específicas</label>
+              <div className="w-full md:w-36 space-y-2">
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Vagas Específicas
+                </label>
                 <input
                   type="number"
                   required
                   min="1"
                   value={cat.slots}
-                  onChange={(e) => updateCategory(index, 'slots', Number(e.target.value))}
-                  class="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
+                  onChange={(e) =>
+                    updateCategory(index, "slots", Number(e.target.value))
+                  }
+                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
                 />
               </div>
 
@@ -362,7 +663,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 <button
                   type="button"
                   onClick={() => removeCategory(index)}
-                  class="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 hover:bg-red-500/20 transition-all text-[10px] uppercase tracking-wider cursor-pointer"
+                  className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 hover:bg-red-500/20 transition-all text-[10px] uppercase tracking-wider cursor-pointer"
                 >
                   Remover
                 </button>
@@ -373,35 +674,44 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       </div>
 
       {/* LOTES DO EVENTO */}
-      <div class="space-y-4 mb-8">
-        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 class="font-heading text-xs font-bold text-white uppercase tracking-wider">Lotes de Inscrição</h3>
+      <div className="space-y-4 mb-8">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+            Lotes de Inscrição
+          </h3>
           <button
             type="button"
             onClick={addBatch}
-            class="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-widest cursor-pointer font-bold"
+            className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-widest cursor-pointer font-bold"
           >
             + Adicionar Lote
           </button>
         </div>
 
-        <div class="space-y-3">
+        <div className="space-y-3">
           {batches.map((bat, index) => (
-            <div key={index} class="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs">
-              <div class="flex-grow space-y-2 w-full">
-                <label class="text-[9px] text-zinc-500 uppercase tracking-wider">Nome do Lote</label>
+            <div
+              key={index}
+              className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs"
+            >
+              <div className="flex-grow space-y-2 w-full">
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Nome do Lote
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="EX: LOTE PROMOCIONAL ou 2º LOTE"
                   value={bat.name}
-                  onChange={(e) => updateBatch(index, 'name', e.target.value)}
-                  class="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                  onChange={(e) => updateBatch(index, "name", e.target.value)}
+                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
                 />
               </div>
 
-              <div class="w-full md:w-52 space-y-2">
-                <label class="text-[9px] text-zinc-500 uppercase tracking-wider">Preço Inscrição (R$)</label>
+              <div className="w-full md:w-52 space-y-2">
+                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                  Preço Inscrição (R$)
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -409,8 +719,8 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   min="0"
                   placeholder="99.90"
                   value={bat.price}
-                  onChange={(e) => updateBatch(index, 'price', e.target.value)}
-                  class="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+                  onChange={(e) => updateBatch(index, "price", e.target.value)}
+                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
                 />
               </div>
 
@@ -418,7 +728,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 <button
                   type="button"
                   onClick={() => removeBatch(index)}
-                  class="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 hover:bg-red-500/20 transition-all text-[10px] uppercase tracking-wider cursor-pointer"
+                  className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 hover:bg-red-500/20 transition-all text-[10px] uppercase tracking-wider cursor-pointer"
                 >
                   Remover
                 </button>
@@ -428,19 +738,32 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         </div>
       </div>
 
-      <div class="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
+      {errorMessage && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase">
+          ✕ {errorMessage}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+          {successMessage}
+        </div>
+      )}
+
+      <div className="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
         <a
-          href="/admin/dashboard"
-          class="border border-zinc-800 hover:border-zinc-700 text-zinc-500 hover:text-white text-xs uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
+          href="/painel-organizador"
+          className="border border-zinc-800 hover:border-zinc-700 text-zinc-500 hover:text-white text-xs uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
         >
           Cancelar
         </a>
         <button
           type="submit"
           disabled={isSubmitting}
-          class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
+          className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
         >
-          {isSubmitting ? 'SALVANDO EVENTO...' : 'PUBLICAR COMPETIÇÃO'}
+          {isSubmitting ? "SALVANDO EVENTO..." : "PUBLICAR COMPETIÇÃO"}
         </button>
       </div>
     </form>

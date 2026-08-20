@@ -1,0 +1,217 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { PrismaClient } from '@prisma/client';
+import { marked } from 'marked';
+
+const genderMap: Record<string, string> = {
+  'MALE': 'Masculino',
+  'FEMALE': 'Feminino',
+  'OPEN': 'Misto'
+};
+
+// Obter sessao do Clerk
+const auth = Astro.locals.auth();
+const userId = auth.userId;
+
+if (!userId) {
+  return Astro.redirect('/');
+}
+
+const prisma = new PrismaClient();
+
+const user = await prisma.user.findUnique({
+  where: { id: userId },
+});
+
+if (!user || user.role !== 'ORGANIZER') {
+  await prisma.$disconnect();
+  return Astro.redirect('/painel-organizador');
+}
+
+const url = new URL(Astro.request.url);
+const eventId = url.searchParams.get('id');
+
+if (!eventId) {
+  await prisma.$disconnect();
+  return Astro.redirect('/painel-organizador');
+}
+
+const event = await prisma.event.findUnique({
+  where: { id: eventId },
+  include: {
+    tenant: true,
+    categories: true,
+    batches: true,
+  }
+});
+
+await prisma.$disconnect();
+
+if (!event) {
+  return Astro.redirect('/painel-organizador');
+}
+
+// Segurança: O organizador só pode ver seus próprios eventos
+if (event.tenantId !== user.tenantId) {
+  return Astro.redirect('/painel-organizador');
+}
+---
+
+<BaseLayout title={`Visualizar: ${event.title}`}>
+  <!-- Cabeçalho HUD -->
+  <section class="bg-[#08090c] border-b border-zinc-900 py-8 px-6">
+    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-[10px] tracking-widest text-zinc-500 gap-2">
+      <a href="/painel-organizador" class="hover:text-emerald-400 transition-colors uppercase flex items-center gap-1.5 mb-2">
+        &larr; Voltar para Dashboard
+      </a>
+      <div class="flex items-center gap-4">
+        <span class="text-blue-400 font-bold">MEUS EVENTOS</span>
+        <span class="text-zinc-700">|</span>
+        <span class="text-zinc-400 font-semibold">VISUALIZAÇÃO (READ-ONLY)</span>
+      </div>
+      <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider mt-2">
+        {event.title}
+      </h1>
+      <div class="text-[10px] uppercase text-amber-500 mt-1 font-bold border border-amber-500/20 bg-amber-500/10 px-2 py-0.5">
+        Modo Leitura — Evento Aprovado/Publicado
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full font-mono text-xs">
+    <div class="bg-[#15171f] border border-zinc-800 p-8 space-y-8 relative">
+      <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="space-y-4">
+          <div>
+            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Modalidade</div>
+            <div class="text-zinc-200 uppercase font-bold bg-[#0d0e12] border border-zinc-800 px-4 py-3">
+              {event.eventType}
+            </div>
+          </div>
+          <div>
+            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Data & Horário</div>
+            <div class="text-zinc-200 bg-[#0d0e12] border border-zinc-800 px-4 py-3">
+              {new Date(event.date).toLocaleString('pt-BR')}
+            </div>
+          </div>
+          <div>
+            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Limite Geral de Vagas</div>
+            <div class="text-zinc-200 bg-[#0d0e12] border border-zinc-800 px-4 py-3">
+              {event.availableSlots} vagas
+            </div>
+          </div>
+          <div>
+            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Localização</div>
+            <div class="text-zinc-200 bg-[#0d0e12] border border-zinc-800 px-4 py-3 truncate" title={event.location || 'Não informado'}>
+              {event.location || 'NÃO INFORMADO'}
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Preview de Mídia</div>
+          <div class="bg-[#0d0e12] border border-zinc-800 p-4 h-full flex flex-col items-center justify-center gap-4">
+            {event.logoUrl && (
+              <img src={event.logoUrl} alt="Logo" class="w-16 h-16 object-cover rounded-full border border-zinc-700" />
+            )}
+            {event.bannerUrl ? (
+              <img src={event.bannerUrl} alt="Banner" class="w-full h-32 object-cover border border-zinc-700" />
+            ) : (
+              <div class="w-full h-32 bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600">Sem Banner</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-zinc-800 pt-6 mb-6">
+        <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4">
+          Informações Básicas / Descrição
+        </h3>
+        <div class="bg-[#0d0e12] border border-zinc-800 p-4 text-zinc-400 font-sans text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
+          {event.description || 'SEM DESCRIÇÃO INFORMADA'}
+        </div>
+      </div>
+
+      <div class="border-t border-zinc-800 pt-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider">
+            Regulamento
+          </h3>
+          <button id="toggle-markdown" class="text-[10px] uppercase text-zinc-400 hover:text-white border border-zinc-800 px-2 py-1 transition-colors cursor-pointer">
+            Ver em Texto Original
+          </button>
+        </div>
+        
+        <div id="contract-html" class="bg-[#0d0e12] border border-zinc-800 p-4 text-zinc-300 font-sans text-xs max-h-64 overflow-y-auto markdown-body space-y-4">
+          <Fragment set:html={event.contractText ? marked.parse(event.contractText) : 'SEM TEXTO DE REGULAMENTO'} />
+        </div>
+
+        <div id="contract-text" class="hidden bg-[#0d0e12] border border-zinc-800 p-4 text-zinc-400 font-sans text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+          {event.contractText || 'SEM TEXTO DE REGULAMENTO'}
+        </div>
+        {event.contractPdf && (
+          <div class="mt-4">
+            <a href={event.contractPdf} target="_blank" class="text-blue-400 hover:underline uppercase text-[10px] font-bold">
+              Visualizar PDF do Regulamento
+            </a>
+          </div>
+        )}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-zinc-800 pt-6">
+        <div>
+          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4">
+            Categorias
+          </h3>
+          <ul class="space-y-2">
+            {event.categories.map((cat: any) => (
+              <li class="bg-[#0d0e12] border border-zinc-800 px-4 py-3 flex items-center justify-between">
+                <span class="text-zinc-200 uppercase font-bold text-[10px]">{cat.name}</span>
+                <span class="text-zinc-500 text-[10px]">{genderMap[cat.gender] || cat.gender} — {cat.availableSlots} vagas</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4">
+            Lotes
+          </h3>
+          <ul class="space-y-2">
+            {event.batches.map((bat: any) => (
+              <li class="bg-[#0d0e12] border border-zinc-800 px-4 py-3 flex items-center justify-between">
+                <span class="text-zinc-200 uppercase font-bold text-[10px]">{bat.name}</span>
+                <span class="text-emerald-400 font-bold text-[10px]">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bat.price))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    const toggleBtn = document.getElementById('toggle-markdown');
+    const htmlView = document.getElementById('contract-html');
+    const textView = document.getElementById('contract-text');
+    let isHtml = true;
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        isHtml = !isHtml;
+        if (isHtml) {
+          htmlView.classList.remove('hidden');
+          textView.classList.add('hidden');
+          toggleBtn.textContent = 'Ver em Texto Original';
+        } else {
+          htmlView.classList.add('hidden');
+          textView.classList.remove('hidden');
+          toggleBtn.textContent = 'Ver em Markdown';
+        }
+      });
+    }
+  </script>
+</BaseLayout>

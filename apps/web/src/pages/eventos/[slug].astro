@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { PrismaClient } from '@prisma/client';
 import { SignInButton } from '@clerk/astro/components';
+import { marked } from 'marked';
 
 const { userId } = Astro.locals.auth();
 
@@ -76,8 +77,6 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       </a>
       <div class="flex items-center gap-4">
         <span class="text-emerald-400 font-bold">DETALHES DO EVENTO</span>
-        <span class="text-zinc-700">|</span>
-        <span>ID: {event.id}</span>
       </div>
     </div>
   </section>
@@ -88,9 +87,26 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       <!-- Coluna Esquerda: Informações do Evento (2/3) -->
       <div class="lg:col-span-2 space-y-8">
         <div>
-          <h1 class="font-heading text-3xl md:text-5xl font-black text-white uppercase tracking-tight leading-none mb-6">
-            {event.title}
-          </h1>
+          {event.bannerUrl && (
+            <img 
+              src={event.bannerUrl} 
+              alt={`Banner de ${event.title}`} 
+              class="w-full h-auto object-cover max-h-[400px] border border-zinc-800 mb-6" 
+            />
+          )}
+
+          <div class="flex items-center gap-4 mb-6">
+            {event.logoUrl && (
+              <img 
+                src={event.logoUrl} 
+                alt={`Logo de ${event.title}`} 
+                class="w-16 h-16 object-cover border border-zinc-800 rounded-full" 
+              />
+            )}
+            <h1 class="font-heading text-3xl md:text-5xl font-black text-white uppercase tracking-tight leading-none">
+              {event.title}
+            </h1>
+          </div>
 
           <div class="flex flex-wrap gap-4 text-xs font-mono text-zinc-400">
             <div class="bg-[#15171f] border border-zinc-800 px-3 py-1.5 uppercase">
@@ -107,6 +123,25 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           <p class="text-zinc-400 text-sm leading-relaxed whitespace-pre-line font-sans">
             {event.description || 'Nenhuma descrição detalhada disponível para este evento.'}
           </p>
+
+          {event.trailerUrl && (
+            <div class="mt-8 border-t border-zinc-800 pt-6">
+              <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                Trailer Promocional
+              </h3>
+              <div class="aspect-w-16 aspect-h-9 relative w-full h-0 pb-[56.25%] border border-zinc-800">
+                <iframe 
+                  src={event.trailerUrl} 
+                  title="YouTube video player" 
+                  frameborder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowfullscreen
+                  class="absolute top-0 left-0 w-full h-full grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+                ></iframe>
+              </div>
+            </div>
+          )}
         </div>
 
         <!-- Regulamento Dinâmico -->
@@ -139,11 +174,43 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               />
             </div>
           ) : (
-            <div class="text-xs text-zinc-400 font-mono space-y-4 whitespace-pre-line leading-relaxed max-h-[400px] overflow-y-auto pr-2">
-              {event.contractText || defaultContractText}
+            <div class="text-xs text-zinc-300 font-sans space-y-4 max-h-[400px] overflow-y-auto pr-2 markdown-body">
+              <Fragment set:html={marked.parse(event.contractText || defaultContractText)} />
             </div>
           )}
         </div>
+
+        <!-- Localização Google Maps (Caso 2) -->
+        {(event.location || event.locationUrl) && (
+          <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-6">
+            <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-zinc-900 pb-3">
+              <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+              Localização do Evento
+            </h3>
+
+            {event.locationUrl ? (
+              <div class="space-y-4">
+                <div class="text-xs text-zinc-400 font-mono uppercase tracking-wider bg-[#0d0e12] border border-zinc-800/80 p-3 flex items-center gap-2">
+                  <span>📍</span>
+                  {event.location || "Local da Prova"}
+                </div>
+                <iframe 
+                  src={event.locationUrl} 
+                  class="w-full h-[350px] border border-zinc-900 grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500" 
+                  allowfullscreen="" 
+                  loading="lazy" 
+                  referrerpolicy="no-referrer-when-downgrade"
+                  title={`Mapa de localização para ${event.title}`}
+                ></iframe>
+              </div>
+            ) : (
+              <div class="text-xs text-zinc-400 font-mono uppercase tracking-wider bg-[#0d0e12] border border-zinc-800/80 p-4 flex items-center gap-2">
+                <span>📍</span>
+                {event.location}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <!-- Coluna Direita: Painel HUD de Inscrição (1/3) -->

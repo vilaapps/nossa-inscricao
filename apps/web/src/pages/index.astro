@@ -4,19 +4,48 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Buscar todos os eventos publicados com seus lotes ativos para obter o preco base
+const url = new URL(Astro.request.url);
+const currentFilter = url.searchParams.get('type') || 'TODOS';
+
+// Filtro condicional
+const whereClause: any = { 
+  status: 'PUBLISHED',
+  date: { gt: new Date() } // Oculta eventos que já passaram
+};
+if (currentFilter !== 'TODOS') {
+  whereClause.eventType = currentFilter;
+}
+
+// Buscar eventos com base no filtro
 const events = await prisma.event.findMany({
-  where: { status: 'PUBLISHED' },
+  where: whereClause,
   include: {
     batches: {
       where: { active: true },
     },
     categories: true,
+    _count: {
+      select: {
+        registrations: {
+          where: {
+            OR: [
+              { paymentStatus: 'PAID' },
+              { status: 'CONFIRMED' },
+            ],
+          },
+        },
+      },
+    },
   },
   orderBy: { date: 'asc' },
 });
 
 await prisma.$disconnect();
+
+// Calcular indicadores dinâmicos
+const totalSlots = events.reduce((sum: number, e: any) => sum + e.availableSlots, 0);
+const filledSlots = events.reduce((sum: number, e: any) => sum + e._count.registrations, 0);
+const fillRate = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
 
 // Formatador de data em Portugues
 const formatDate = (date: Date) => {
@@ -63,7 +92,7 @@ const getStartingPrice = (event: any) => {
 
       <!-- Subtitulo assimetrico e curto -->
       <p class="text-zinc-400 font-sans text-base md:text-lg max-w-xl mb-8 leading-relaxed">
-        Plataforma inteligente multi-tenant com cronometragem instantânea e checkout dinâmico integrado para maratonas, ciclismo de estrada e ultra trail.
+        Inscrição rápida e segura para corridas, duatlo, triatlo, ultra trail, mountain bike, aventuras, etc.
       </p>
 
       <!-- Stats do HUD na lateral inferior -->
@@ -73,16 +102,12 @@ const getStartingPrice = (event: any) => {
           <div class="text-2xl font-bold text-white mt-1">{events.length}</div>
         </div>
         <div>
-          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Tempo de Resposta</div>
-          <div class="text-2xl font-bold text-emerald-400 mt-1">45ms</div>
-        </div>
-        <div>
           <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Vagas Preenchidas</div>
-          <div class="text-2xl font-bold text-white mt-1">87%</div>
+          <div class="text-2xl font-bold text-white mt-1">{fillRate}%</div>
         </div>
         <div>
-          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Gateway</div>
-          <div class="text-2xl font-bold text-blue-400 mt-1">Asaas API</div>
+          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Atletas Inscritos</div>
+          <div class="text-2xl font-bold text-white mt-1">{filledSlots}</div>
         </div>
       </div>
     </div>
@@ -99,58 +124,65 @@ const getStartingPrice = (event: any) => {
 
       <!-- Barra de Filtro Estatica (Visual HUD) -->
       <div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
-        <button class="bg-emerald-500/10 border border-emerald-500 text-emerald-400 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+        <a href="/" class={`${currentFilter === 'TODOS' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
           Todos
-        </button>
-        <button class="border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+        </a>
+        <a href="/?type=CORRIDA" class={`${currentFilter === 'CORRIDA' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
           Corrida
-        </button>
-        <button class="border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+        </a>
+        <a href="/?type=CICLISMO" class={`${currentFilter === 'CICLISMO' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
           Ciclismo
-        </button>
-        <button class="border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200">
+        </a>
+        <a href="/?type=ULTRA_TRAIL" class={`${currentFilter === 'ULTRA_TRAIL' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
           Ultra Trail
-        </button>
+        </a>
+        <a href="/?type=TRIATHLON" class={`${currentFilter === 'TRIATHLON' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
+          Triathlon
+        </a>
       </div>
     </div>
 
     <!-- Grid de Eventos -->
     {events.length === 0 ? (
       <div class="border border-dashed border-zinc-800 p-12 text-center text-zinc-500 font-mono">
-        NENHUM EVENTO ENCONTRADO NO SISTEMA.
+        NENHUM EVENTO ENCONTRADO PARA O FILTRO SELECIONADO.
       </div>
     ) : (
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {events.map((event) => {
-          // Determina a modalidade com base no titulo ou slug para fins de badges
-          let categoryBadge = "CORRIDA";
-          if (event.slug.includes("ciclismo")) categoryBadge = "CICLISMO";
-          if (event.slug.includes("trail")) categoryBadge = "TRAIL RUN";
+          // Remover lógica frágil e usar o campo real do banco (Substituir underscores por espaço para UI)
+          const categoryBadge = event.eventType ? event.eventType.replace('_', ' ') : 'CORRIDA';
 
           return (
             <div class="group relative bg-[#15171f] border border-zinc-800 hover:border-emerald-500/40 p-6 flex flex-col justify-between transition-all duration-300">
-              <!-- Elemento de canto decorativo HUD -->
-              <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-transparent group-hover:border-emerald-400 transition-colors duration-300 pointer-events-none"></div>
               
               <div>
-                <!-- Tag e Status -->
-                <div class="flex items-center justify-between mb-4 font-mono text-[10px] tracking-widest">
-                  <span class="text-zinc-500 uppercase">{categoryBadge}</span>
-                  <span class="text-emerald-400 flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                    INSCR. ABERTAS
-                  </span>
-                </div>
+                <!-- Mídia ou Tag Superior -->
+                {event.bannerUrl ? (
+                  <div class="w-full h-32 mb-4 bg-zinc-900 border border-zinc-800 relative overflow-hidden">
+                    <img src={event.bannerUrl} alt={event.title} class="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500" />
+                    <div class="absolute top-2 left-2 flex items-center justify-between w-[calc(100%-1rem)] font-mono text-[9px] tracking-widest z-10">
+                      <span class="bg-black/60 backdrop-blur-sm text-emerald-400 px-2 py-1 font-bold">{categoryBadge}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div class="flex items-center justify-between mb-4 font-mono text-[10px] tracking-widest">
+                    <span class="text-emerald-400 font-bold">{categoryBadge}</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  </div>
+                )}
 
-                <!-- Titulo -->
-                <h3 class="font-heading text-lg font-bold text-white group-hover:text-emerald-400 transition-colors duration-200 line-clamp-2 uppercase">
-                  {event.title}
-                </h3>
+                <a href={`/eventos/${event.slug}`} class="block group-hover:text-emerald-400 transition-colors">
+                  <!-- Titulo -->
+                  <h3 class="font-heading text-lg font-bold text-white group-hover:text-emerald-400 transition-colors duration-200 line-clamp-2 uppercase">
+                    {event.title}
+                  </h3>
 
-                <!-- Descricao Curta -->
-                <p class="text-zinc-500 text-sm mt-3 font-sans line-clamp-3 leading-relaxed">
-                  {event.description}
-                </p>
+                  <!-- Descricao Curta -->
+                  <p class="text-zinc-500 text-sm mt-3 font-sans line-clamp-3 leading-relaxed">
+                    {event.description}
+                  </p>
+                </a>
               </div>
 
               <div class="mt-8 pt-6 border-t border-zinc-800/60">

@@ -44,19 +44,45 @@ const formatCurrency = (val: number) => {
 };
 
 // Mapeamento de Cores de Status
-const getStatusClasses = (status: string, paymentStatus: string) => {
+const getStatusClasses = (status: string, paymentStatus: string, context: 'ACTIVE' | 'CANCELLED' | 'PAST') => {
+  // 1. Contexto de Evento que já passou
+  if (context === 'PAST') {
+    if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
+      return {
+        bg: 'bg-blue-500/5 border-blue-500/20 text-blue-400',
+        label: 'Participou',
+        indicator: 'bg-blue-500',
+      };
+    }
+    return {
+      bg: 'bg-zinc-500/5 border-zinc-500/20 text-zinc-500',
+      label: 'Não Participou',
+      indicator: 'bg-zinc-500',
+    };
+  }
+
+  // 2. Contexto de Inscrições Canceladas/Expiradas (Evento no futuro)
+  if (context === 'CANCELLED') {
+    if (status === 'CANCELLED') {
+      return {
+        bg: 'bg-red-500/5 border-red-500/20 text-red-400',
+        label: 'Cancelada',
+        indicator: 'bg-red-500',
+      };
+    }
+    return {
+      bg: 'bg-zinc-500/5 border-zinc-500/20 text-zinc-400',
+      label: 'Pagamento Expirado',
+      indicator: 'bg-zinc-500',
+    };
+  }
+
+  // 3. Contexto Vigente
   if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
     return {
       bg: 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400',
       label: 'Confirmada & Paga',
       indicator: 'bg-emerald-500',
-    };
-  }
-  if (status === 'CANCELLED' || status === 'EXPIRED') {
-    return {
-      bg: 'bg-red-500/5 border-red-500/20 text-red-400',
-      label: 'Cancelada',
-      indicator: 'bg-red-500',
     };
   }
   return {
@@ -65,6 +91,26 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
     indicator: 'bg-amber-500',
   };
 };
+
+const now = new Date();
+
+// Apenas Inscrições válidas para eventos futuros
+const activeRegistrations = registrations.filter(r => 
+  new Date(r.event.date) > now && 
+  r.status !== 'CANCELLED' && 
+  r.status !== 'EXPIRED'
+);
+
+// Inscrições canceladas ou com pagamento expirado para eventos futuros
+const cancelledRegistrations = registrations.filter(r => 
+  new Date(r.event.date) > now && 
+  (r.status === 'CANCELLED' || r.status === 'EXPIRED')
+);
+
+// Eventos que já aconteceram (Histórico do Atleta)
+const pastRegistrations = registrations.filter(r => 
+  new Date(r.event.date) <= now
+);
 ---
 
 <BaseLayout title="Minhas Inscrições — Painel do Participante">
@@ -76,29 +122,30 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
           Minhas Inscrições
         </h1>
       </div>
-      <div class="text-xs text-zinc-500 uppercase tracking-widest">
-        Participante ID: <span class="text-zinc-300">{userId.substring(0, 15)}...</span>
-      </div>
     </div>
   </section>
 
-  <section class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full">
-    {registrations.length === 0 ? (
-      <div class="border border-dashed border-zinc-800 p-16 text-center font-mono text-zinc-500 space-y-6">
-        <div>VOCÊ NÃO POSSUI NENHUMA INSCRIÇÃO ATIVA NO MOMENTO.</div>
-        <a
-          href="/"
-          class="inline-block bg-zinc-900 border border-zinc-800 hover:border-emerald-500 text-white text-xs uppercase px-8 py-3 tracking-widest font-semibold transition-all duration-200"
-        >
-          Navegar por Eventos
-        </a>
-      </div>
-    ) : (
-      <div class="space-y-8">
-        <!-- Grid de Cards de Inscrição -->
+  <section class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full space-y-16">
+    {/* VIGENTES */}
+    <div>
+      <h2 class="font-heading text-xl font-bold uppercase text-white tracking-wider mb-6 border-b border-zinc-800 pb-4">
+        Inscrições Vigentes
+      </h2>
+      
+      {activeRegistrations.length === 0 ? (
+        <div class="border border-dashed border-zinc-800 p-12 text-center font-mono text-zinc-500 space-y-6">
+          <div>VOCÊ NÃO POSSUI NENHUMA INSCRIÇÃO ATIVA NO MOMENTO.</div>
+          <a
+            href="/"
+            class="inline-block bg-zinc-900 border border-zinc-800 hover:border-emerald-500 text-white text-xs uppercase px-8 py-3 tracking-widest font-semibold transition-all duration-200"
+          >
+            Navegar por Eventos
+          </a>
+        </div>
+      ) : (
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {registrations.map((reg) => {
-            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus);
+          {activeRegistrations.map((reg) => {
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'ACTIVE');
             const isPending = reg.status === 'PENDING' || reg.status === 'QUEUED';
             const pixCode = reg.payment?.pixQrCode;
 
@@ -107,7 +154,6 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
                 <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-800 pointer-events-none group-hover:border-zinc-700 transition-colors"></div>
 
                 <div>
-                  <!-- Header do Card -->
                   <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
                     <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
                     <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
@@ -116,12 +162,10 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
                     </span>
                   </div>
 
-                  <!-- Título do Evento -->
                   <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider mb-2">
                     {reg.event.title}
                   </h3>
 
-                  <!-- Detalhes Físicos/Técnicos -->
                   <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-400">
                     <div>
                       <span class="text-zinc-500 block uppercase">Categoria</span>
@@ -142,7 +186,6 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
                   </div>
                 </div>
 
-                <!-- Seção de Pagamento PIX Pendente -->
                 {isPending && pixCode && (
                   <div class="border-t border-zinc-800/60 pt-6 mt-4 space-y-4 font-mono text-xs">
                     <div class="bg-[#0d0e12] border border-zinc-800 p-4 space-y-3">
@@ -154,7 +197,6 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
                         <span class="text-zinc-500">Gateway: Asaas</span>
                       </div>
                       
-                      <!-- QR Code Preview -->
                       <div class="w-36 h-36 mx-auto bg-white p-2 border border-zinc-800">
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(pixCode)}`}
@@ -163,7 +205,6 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
                         />
                       </div>
 
-                      {/* Pix Copia e Cola */}
                       <div class="space-y-1">
                         <span class="text-[9px] text-zinc-500 uppercase">PIX Copia e Cola</span>
                         <div class="flex gap-1">
@@ -184,6 +225,112 @@ const getStatusClasses = (status: string, paymentStatus: string) => {
                     </div>
                   </div>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+
+    {/* CANCELADAS / EXPIRADAS (Eventos Futuros) */}
+    {cancelledRegistrations.length > 0 && (
+      <div>
+        <h2 class="font-heading text-xl font-bold uppercase text-white tracking-wider mb-6 border-b border-zinc-800 pb-4">
+          Inscrições Canceladas
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
+          {cancelledRegistrations.map((reg) => {
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'CANCELLED');
+
+            return (
+              <div class="bg-[#15171f] border border-red-500/10 p-6 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300">
+                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-red-500/20 pointer-events-none group-hover:border-red-500/40 transition-colors"></div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
+                    <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
+                    <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
+                      <span class={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator}`}></span>
+                      {statusConfig.label}
+                    </span>
+                  </div>
+
+                  <h3 class="font-heading text-lg font-bold text-zinc-400 uppercase tracking-wider mb-2 line-through decoration-red-500/30">
+                    {reg.event.title}
+                  </h3>
+
+                  <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-500">
+                    <div>
+                      <span class="text-zinc-600 block uppercase">Categoria</span>
+                      <span class="block mt-0.5">{reg.category.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-600 block uppercase">Lote Adquirido</span>
+                      <span class="block mt-0.5">{reg.batch.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-600 block uppercase">Valor</span>
+                      <span class="block mt-0.5">{formatCurrency(Number(reg.amountPaid))}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-600 block uppercase">Data Inscrição</span>
+                      <span class="block mt-0.5">{formatDate(reg.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {/* ENCERRADAS (Histórico de Eventos) */}
+    {pastRegistrations.length > 0 && (
+      <div>
+        <h2 class="font-heading text-xl font-bold uppercase text-white tracking-wider mb-6 border-b border-zinc-800 pb-4">
+          Histórico de Eventos
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
+          {pastRegistrations.map((reg) => {
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'PAST');
+
+            return (
+              <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300">
+                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-800 pointer-events-none group-hover:border-zinc-700 transition-colors"></div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
+                    <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
+                    <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
+                      <span class={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator}`}></span>
+                      {statusConfig.label}
+                    </span>
+                  </div>
+
+                  <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider mb-2">
+                    {reg.event.title}
+                  </h3>
+
+                  <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-400">
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Categoria</span>
+                      <span class="text-zinc-300 block mt-0.5">{reg.category.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Lote Adquirido</span>
+                      <span class="text-zinc-300 block mt-0.5">{reg.batch.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Valor Pago</span>
+                      <span class="text-zinc-200 font-bold block mt-0.5">{formatCurrency(Number(reg.amountPaid))}</span>
+                    </div>
+                    <div>
+                      <span class="text-zinc-500 block uppercase">Data Inscrição</span>
+                      <span class="text-zinc-300 block mt-0.5">{formatDate(reg.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}

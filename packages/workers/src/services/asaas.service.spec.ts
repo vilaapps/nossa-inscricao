@@ -415,4 +415,71 @@ describe('AsaasService', () => {
       expect(res).toBeNull();
     });
   });
+
+  describe('refundPayment', () => {
+    it('should refund payment successfully with default parameters', async () => {
+      const service = new AsaasService();
+      const mockRefundResponse = { id: 'ref_123', status: 'REFUNDED' };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockRefundResponse,
+      } as Response);
+
+      const response = await service.refundPayment('pay_123');
+
+      expect(response).toEqual(mockRefundResponse);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api-sandbox.asaas.com/v3/payments/pay_123/refund',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': 'test-global-key',
+          },
+          body: undefined,
+        })
+      );
+    });
+
+    it('should refund payment with custom value, description and tenant API key', async () => {
+      const service = new AsaasService();
+      const mockRefundResponse = { id: 'ref_456', status: 'REFUNDED', value: 50 };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockRefundResponse,
+      } as Response);
+
+      const response = await service.refundPayment('pay_456', 50, 'Organização cancelada', 'tenant-key');
+
+      expect(response).toEqual(mockRefundResponse);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api-sandbox.asaas.com/v3/payments/pay_456/refund',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': 'tenant-key',
+          },
+          body: JSON.stringify({ value: 50, description: 'Organização cancelada' }),
+        })
+      );
+    });
+
+    it('should throw an error when refund payment fails on gateway', async () => {
+      const service = new AsaasService();
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        statusText: 'Bad Request',
+        text: async () => 'Payment already refunded',
+      } as Response);
+
+      await expect(
+        service.refundPayment('pay_123')
+      ).rejects.toThrow('Failed to refund Asaas payment: Bad Request - Payment already refunded');
+    });
+  });
 });
+

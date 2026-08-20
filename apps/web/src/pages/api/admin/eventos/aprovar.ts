@@ -38,7 +38,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // 3. Atualizar o status do Evento para PUBLISHED no banco de dados
+    // 3. Buscar o evento para validar status atual
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      return new Response(JSON.stringify({ message: 'Evento não encontrado.' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (event.status !== 'DRAFT') {
+      return new Response(JSON.stringify({ message: 'Apenas eventos em rascunho (DRAFT) podem ser aprovados.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 4. Atualizar o status do Evento para PUBLISHED no banco de dados
     const updatedEvent = await prisma.event.update({
       where: { id: eventId },
       data: {
@@ -52,8 +71,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
   } catch (err: any) {
-    console.error('Erro ao aprovar evento:', err);
-    return new Response(JSON.stringify({ message: err.message || 'Erro interno do servidor.' }), {
+    console.error('Erro na rota:', err);
+    
+    // Tenta salvar o log de forma segura
+    try {
+      const errorData = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      // Garante que prisma está instanciado no escopo
+      if (typeof prisma !== 'undefined') {
+        await prisma.systemLog.create({
+          data: {
+            source: 'BACKEND',
+            errorData: errorData,
+          }
+        });
+      }
+    } catch (logErr) {
+      console.error('Erro ao salvar log no banco:', logErr);
+    }
+    
+    // Filtro de segurança para não expor detalhes de banco ao cliente
+    const isPrismaError = err.clientVersion || err.code || err.meta;
+    const isSupabaseError = err.__isStorageError || err.status === 400 || err.status === 403;
+    const clientMessage = (isPrismaError || isSupabaseError) 
+      ? 'Ocorreu um erro interno no servidor ao processar sua requisição.' 
+      : (err.message || 'Erro interno do servidor.');
+
+    return new Response(JSON.stringify({ message: clientMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

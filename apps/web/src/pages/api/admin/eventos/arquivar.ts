@@ -15,13 +15,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const prisma = new PrismaClient();
 
   try {
-    // 1. Validar se o usuário atual é ADMIN no banco de dados local
+    // 1. Validar se o usuário atual existe e obter dados
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user || user.role !== 'ADMIN') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas administradores podem alterar comissões.' }), {
+    if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Apenas organizadores ou administradores podem arquivar eventos.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -29,32 +29,45 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // 2. Extrair dados da requisição
     const body = await request.json();
-    const { tenantId, commissionRate } = body;
+    const { eventId } = body;
 
-    if (!tenantId || commissionRate === undefined) {
-      return new Response(JSON.stringify({ message: 'tenantId e commissionRate são obrigatórios.' }), {
+    if (!eventId) {
+      return new Response(JSON.stringify({ message: 'eventId é obrigatório.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const rate = parseFloat(commissionRate);
-    if (isNaN(rate) || rate < 0 || rate > 100) {
-      return new Response(JSON.stringify({ message: 'A taxa de comissão deve ser um número entre 0 e 100.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 3. Atualizar a comissão do Tenant no banco de dados
-    const updatedTenant = await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        commissionRate: rate,
-      },
+    // 3. Buscar o evento para validar permissão e status
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
     });
 
-    return new Response(JSON.stringify({ success: true, tenantId: updatedTenant.id, commissionRate: Number(updatedTenant.commissionRate) }), {
+    if (!event) {
+      return new Response(JSON.stringify({ message: 'Evento não encontrado.' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Apenas admins podem arquivar qualquer evento, organizadores só podem arquivar os seus próprios
+    if (user.role === 'ORGANIZER' && event.tenantId !== user.tenantId) {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Você só pode arquivar eventos da sua organização.' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 4. Arquivar logicamente o evento
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        status: 'ARCHIVED',
+        archivedAt: new Date()
+      }
+    });
+
+    return new Response(JSON.stringify({ success: true, message: 'Evento arquivado com sucesso.' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

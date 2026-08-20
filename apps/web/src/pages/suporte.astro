@@ -1,0 +1,94 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Suporte — SyncFlow">
+  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+    <div class="max-w-4xl mx-auto font-mono">
+      <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+        Central de Atendimento
+      </div>
+      <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+        Suporte
+      </h1>
+      <p class="text-zinc-500 text-xs mt-2 uppercase tracking-wider">Estamos aqui para ajudar</p>
+    </div>
+  </section>
+
+  <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full space-y-12">
+    
+    <!-- Canais de Contato -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3 relative">
+        <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-700 pointer-events-none"></div>
+        <div class="text-[10px] uppercase tracking-widest text-emerald-400 font-bold font-mono">E-mail</div>
+        <div class="text-white font-heading text-lg font-bold uppercase tracking-wider">Contato Direto</div>
+        <p class="text-zinc-500 text-xs leading-relaxed">Envie sua dúvida ou solicitação por e-mail. Respondemos em até 48 horas úteis.</p>
+        <a href="mailto:contato@nossainscricao.com.br" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors mt-2">
+          contato@nossainscricao.com.br
+        </a>
+      </div>
+
+      <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3 relative">
+        <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-700 pointer-events-none"></div>
+        <div class="text-[10px] uppercase tracking-widest text-emerald-400 font-bold font-mono">WhatsApp</div>
+        <div class="text-white font-heading text-lg font-bold uppercase tracking-wider">Atendimento Rápido</div>
+        <p class="text-zinc-500 text-xs leading-relaxed">Para questões urgentes, entre em contato pelo WhatsApp nos horários comerciais.</p>
+        <a href="https://wa.me/5500000000000" target="_blank" rel="noopener" class="inline-block border border-zinc-700 hover:border-emerald-500 text-zinc-400 hover:text-emerald-400 text-[10px] uppercase px-4 py-2 font-bold tracking-wider transition-colors mt-2">
+          Abrir WhatsApp
+        </a>
+      </div>
+
+      <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3 relative">
+        <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-700 pointer-events-none"></div>
+        <div class="text-[10px] uppercase tracking-widest text-emerald-400 font-bold font-mono">Horário</div>
+        <div class="text-white font-heading text-lg font-bold uppercase tracking-wider">Atendimento</div>
+        <p class="text-zinc-500 text-xs leading-relaxed">Segunda a Sexta, das 9h às 18h (horário de Brasília). Exceto feriados nacionais.</p>
+        <div class="text-zinc-600 text-[10px] uppercase tracking-wider font-mono mt-2">
+          <span class="text-emerald-400">●</span> GMT-3 — Brasília
+        </div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="space-y-6">
+      <h2 class="font-heading text-xl font-extrabold uppercase text-white tracking-wider border-b border-zinc-800 pb-4 font-mono">
+        Perguntas Frequentes
+      </h2>
+
+      <div class="space-y-4">
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3">
+          <h3 class="text-white font-bold text-sm uppercase tracking-wider font-mono">Como me inscrevo em um evento?</h3>
+          <p class="text-zinc-500 text-xs leading-relaxed">Acesse a página do evento desejado, escolha a categoria e o lote disponível, preencha seus dados pessoais e realize o pagamento via PIX ou cartão de crédito. Você receberá um e-mail de confirmação após o pagamento ser processado.</p>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3">
+          <h3 class="text-white font-bold text-sm uppercase tracking-wider font-mono">Posso cancelar minha inscrição?</h3>
+          <p class="text-zinc-500 text-xs leading-relaxed">A política de cancelamento varia por evento e é definida pelo organizador. Entre em contato com o organizador do evento para solicitar o cancelamento. Em caso de cancelamento do evento pela organização, o estorno é processado automaticamente pela plataforma.</p>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3">
+          <h3 class="text-white font-bold text-sm uppercase tracking-wider font-mono">Como me torno um organizador?</h3>
+          <p class="text-zinc-500 text-xs leading-relaxed">Após criar sua conta na plataforma, acesse o menu "Traga seu evento" e preencha o formulário de cadastro de organização com o nome da sua empresa e CPF/CNPJ. Após aprovação, você poderá criar e gerenciar competições.</p>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3">
+          <h3 class="text-white font-bold text-sm uppercase tracking-wider font-mono">Meu pagamento não foi confirmado. O que fazer?</h3>
+          <p class="text-zinc-500 text-xs leading-relaxed">Pagamentos via PIX podem levar até alguns minutos para serem processados. Se após 30 minutos o status não atualizar, verifique se o pagamento foi efetivado no seu banco. Caso o problema persista, entre em contato conosco com o comprovante de pagamento.</p>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3">
+          <h3 class="text-white font-bold text-sm uppercase tracking-wider font-mono">Quais formas de pagamento são aceitas?</h3>
+          <p class="text-zinc-500 text-xs leading-relaxed">Aceitamos pagamentos via PIX (confirmação instantânea) e cartão de crédito. O PIX é processado pelo gateway Asaas com confirmação automática via webhook.</p>
+        </div>
+
+        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-3">
+          <h3 class="text-white font-bold text-sm uppercase tracking-wider font-mono">Como acompanho minhas inscrições?</h3>
+          <p class="text-zinc-500 text-xs leading-relaxed">Acesse o menu "Minhas Inscrições" no topo da página. Lá você encontrará todas as suas inscrições com status atualizado (pendente, confirmada, cancelada), detalhes do evento e comprovante de pagamento.</p>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</BaseLayout>
