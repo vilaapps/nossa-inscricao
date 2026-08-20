@@ -1,5 +1,8 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin, SUPABASE_BUCKET_NAME, isServiceRoleConfigured } from '../../../lib/server/supabase-admin';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const ALLOWED_FOLDERS = ['banners', 'logos', 'general'];
 const ALLOWED_CONTENT_TYPES = [
@@ -21,10 +24,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   if (!isServiceRoleConfigured) {
+    console.error('[Upload-URL] Erro: SUPABASE_SERVICE_ROLE_KEY não configurada no ambiente.');
     return new Response(
       JSON.stringify({
         message:
-          'Erro ao efetuar upload de imagens',
+          'Erro ao efetuar upload de imagens. Contate o suporte técnico.',
       }),
       {
         status: 400,
@@ -69,7 +73,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .createSignedUploadUrl(fileName);
 
     if (error || !data) {
-      console.error('Erro ao gerar Signed Upload URL no Supabase:', error);
+      console.error('[Upload-URL] Falha do Supabase ao criar URL assinada:', error);
       throw new Error(error?.message || 'Falha ao criar URL de upload assinado.');
     }
 
@@ -91,9 +95,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     );
   } catch (err: any) {
-    console.error('Erro no /api/admin/upload-url:', err);
+    const errorDetails = err.message || err;
+    console.error('[Upload-URL] Exceção capturada:', errorDetails);
+    
+    try {
+      await prisma.systemLog.create({
+        data: {
+          source: 'BACKEND_UPLOAD_URL',
+          errorData: {
+            message: err.message,
+            stack: err.stack,
+            raw: err
+          }
+        }
+      });
+    } catch (logErr) {
+      console.error('Falha ao salvar log no DB:', logErr);
+    }
+
     return new Response(
-      JSON.stringify({ message: err.message || 'Erro interno ao gerar URL de upload.' }),
+      JSON.stringify({ message: 'Erro interno ao gerar URL de upload. Tente novamente mais tarde.' }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },

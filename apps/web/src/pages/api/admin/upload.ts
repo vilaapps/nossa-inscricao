@@ -1,5 +1,8 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin, SUPABASE_BUCKET_NAME } from '../../../lib/server/supabase-admin';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const auth = locals.auth();
@@ -37,8 +40,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
 
     if (error) {
-      console.error('Supabase upload error:', error);
-      throw new Error(error.message);
+      console.error('[Upload-Direct] Supabase upload error:', error);
+      throw new Error('Falha no Supabase ao fazer upload.');
     }
 
     // Obter a URL pública da imagem
@@ -52,8 +55,25 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
 
   } catch (err: any) {
-    console.error('Erro no upload:', err);
-    return new Response(JSON.stringify({ message: err.message || 'Erro ao fazer upload da imagem.' }), {
+    const errorDetails = err.message || err;
+    console.error('[Upload-Direct] Exceção no upload:', errorDetails);
+    
+    try {
+      await prisma.systemLog.create({
+        data: {
+          source: 'BACKEND_UPLOAD',
+          errorData: {
+            message: err.message,
+            stack: err.stack,
+            raw: err
+          }
+        }
+      });
+    } catch (logErr) {
+      console.error('Falha ao salvar log no DB:', logErr);
+    }
+
+    return new Response(JSON.stringify({ message: 'Erro interno ao processar o upload do arquivo. Contate o suporte técnico.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
