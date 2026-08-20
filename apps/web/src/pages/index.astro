@@ -7,16 +7,13 @@ const prisma = new PrismaClient();
 const url = new URL(Astro.request.url);
 const currentFilter = url.searchParams.get('type') || 'TODOS';
 
-// Filtro condicional
+// Filtro
 const whereClause: any = { 
   status: 'PUBLISHED',
   date: { gt: new Date() } // Oculta eventos que já passaram
 };
-if (currentFilter !== 'TODOS') {
-  whereClause.eventType = currentFilter;
-}
 
-// Buscar eventos com base no filtro
+// Buscar eventos (traz todos para filtrar no cliente)
 const events = await prisma.event.findMany({
   where: whereClause,
   include: {
@@ -123,38 +120,41 @@ const getStartingPrice = (event: any) => {
       </div>
 
       <!-- Barra de Filtro Estatica (Visual HUD) -->
-      <div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
-        <a href="/" class={`${currentFilter === 'TODOS' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
+      <div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0" id="filter-container">
+        <button data-filter="TODOS" class={`${currentFilter === 'TODOS' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} filter-btn border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200 cursor-pointer`}>
           Todos
-        </a>
-        <a href="/?type=CORRIDA" class={`${currentFilter === 'CORRIDA' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
+        </button>
+        <button data-filter="CORRIDA" class={`${currentFilter === 'CORRIDA' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} filter-btn border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200 cursor-pointer`}>
           Corrida
-        </a>
-        <a href="/?type=CICLISMO" class={`${currentFilter === 'CICLISMO' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
+        </button>
+        <button data-filter="CICLISMO" class={`${currentFilter === 'CICLISMO' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} filter-btn border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200 cursor-pointer`}>
           Ciclismo
-        </a>
-        <a href="/?type=ULTRA_TRAIL" class={`${currentFilter === 'ULTRA_TRAIL' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
+        </button>
+        <button data-filter="ULTRA_TRAIL" class={`${currentFilter === 'ULTRA_TRAIL' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} filter-btn border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200 cursor-pointer`}>
           Ultra Trail
-        </a>
-        <a href="/?type=TRIATHLON" class={`${currentFilter === 'TRIATHLON' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200`}>
+        </button>
+        <button data-filter="TRIATHLON" class={`${currentFilter === 'TRIATHLON' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'} filter-btn border text-[10px] font-mono uppercase px-3 py-1.5 tracking-wider transition-all duration-200 cursor-pointer`}>
           Triathlon
-        </a>
+        </button>
       </div>
     </div>
 
     <!-- Grid de Eventos -->
-    {events.length === 0 ? (
-      <div class="border border-dashed border-zinc-800 p-12 text-center text-zinc-500 font-mono">
-        NENHUM EVENTO ENCONTRADO PARA O FILTRO SELECIONADO.
-      </div>
-    ) : (
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div id="empty-state" class={`border border-dashed border-zinc-800 p-12 text-center text-zinc-500 font-mono ${events.length > 0 && events.some(e => currentFilter === 'TODOS' || e.eventType === currentFilter) ? 'hidden' : 'block'}`}>
+      NENHUM EVENTO ENCONTRADO PARA O FILTRO SELECIONADO.
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="events-grid">
         {events.map((event) => {
           // Remover lógica frágil e usar o campo real do banco (Substituir underscores por espaço para UI)
           const categoryBadge = event.eventType ? event.eventType.replace('_', ' ') : 'CORRIDA';
+          const isVisible = currentFilter === 'TODOS' || event.eventType === currentFilter;
 
           return (
-            <div class="group relative bg-[#15171f] border border-zinc-800 hover:border-emerald-500/40 p-6 flex flex-col justify-between transition-all duration-300">
+            <div 
+              class={`event-card group relative bg-[#15171f] border border-zinc-800 hover:border-emerald-500/40 p-6 flex-col justify-between transition-all duration-300 ${isVisible ? 'flex' : 'hidden'}`}
+              data-type={event.eventType}
+            >
               
               <div>
                 <!-- Mídia ou Tag Superior -->
@@ -209,6 +209,83 @@ const getStartingPrice = (event: any) => {
           );
         })}
       </div>
-    )}
   </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const filterBtns = document.querySelectorAll('.filter-btn');
+      const eventCards = document.querySelectorAll('.event-card');
+      const emptyState = document.getElementById('empty-state');
+      
+      const activeClasses = ['bg-emerald-500/10', 'border-emerald-500', 'text-emerald-400'];
+      const inactiveClasses = ['border-zinc-800', 'text-zinc-400'];
+      const hoverClasses = ['hover:text-white', 'hover:border-zinc-700'];
+
+      function updateDOM(filterType: string) {
+        // Atualizar botoes
+        filterBtns.forEach(btn => {
+          if ((btn as HTMLElement).dataset.filter === filterType) {
+            btn.classList.add(...activeClasses);
+            btn.classList.remove(...inactiveClasses, ...hoverClasses);
+          } else {
+            btn.classList.remove(...activeClasses);
+            btn.classList.add(...inactiveClasses, ...hoverClasses);
+          }
+        });
+        
+        // Filtrar cards
+        let visibleCount = 0;
+        eventCards.forEach(card => {
+          if (filterType === 'TODOS' || (card as HTMLElement).dataset.type === filterType) {
+            card.classList.remove('hidden');
+            card.classList.add('flex');
+            visibleCount++;
+          } else {
+            card.classList.remove('flex');
+            card.classList.add('hidden');
+          }
+        });
+        
+        // Estado vazio
+        if (emptyState) {
+          if (visibleCount === 0) {
+            emptyState.classList.remove('hidden');
+            emptyState.classList.add('block');
+          } else {
+            emptyState.classList.remove('block');
+            emptyState.classList.add('hidden');
+          }
+        }
+        
+        // Atualizar URL (sem reload)
+        const url = new URL(window.location.href);
+        if (filterType === 'TODOS') {
+          url.searchParams.delete('type');
+        } else {
+          url.searchParams.set('type', filterType);
+        }
+        window.history.replaceState({}, '', url);
+      }
+
+      function applyFilter(filterType: string) {
+        // Se a API de View Transitions for suportada, a transição da altura e dos cards será animada suavemente
+        if (!document.startViewTransition) {
+          updateDOM(filterType);
+          return;
+        }
+        
+        document.startViewTransition(() => {
+          updateDOM(filterType);
+        });
+      }
+
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const filter = (btn as HTMLElement).dataset.filter;
+          if (filter) applyFilter(filter);
+        });
+      });
+    });
+  </script>
 </BaseLayout>
