@@ -45,3 +45,4 @@ DEVELOPMENT_SETUP.md
 .env.prd
 .env.prd.local
 .env.dev.local
+.env.prod
