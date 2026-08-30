@@ -45,7 +45,7 @@ if (userId) {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&display=swap"
       rel="stylesheet"
     />
 
@@ -56,42 +56,59 @@ if (userId) {
     {ogImage && <meta property="og:image" content={ogImage} />}
 
     <meta name="generator" content={Astro.generator} />
-    <title>{title} | SyncFlow</title>
+    <title>{title} | Nossa Inscrição</title>
+
+    <script is:inline>
+      const theme = (() => {
+        if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+          return localStorage.getItem('theme');
+        }
+        return 'light'; // Padrão é Modo Claro
+      })();
+    
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      window.localStorage.setItem('theme', theme);
+    </script>
   </head>
-  <body class="flex flex-col min-h-dvh font-sans selection:bg-emerald-500/20 selection:text-emerald-400">
+  <body class="flex flex-col min-h-dvh font-sans">
     <!-- Header Minimal Tech / Asymmetric HUD -->
-    <header class="sticky top-0 z-50 w-full bg-[#0d0e12]/80 backdrop-blur-md border-b border-zinc-800/80">
+    <header class="sticky top-0 z-50 w-full bg-surface/80 backdrop-blur-md border-b border-surface-alt">
       <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <!-- Logo -->
-        <a href="/" class="font-heading text-xl font-extrabold tracking-wider text-emerald-400 hover:opacity-90 transition-opacity">
-          SYNCFLOW<span class="text-white">.</span>
+        <a href="/" class="font-heading text-xl font-black tracking-tighter text-ink flex items-baseline hover:opacity-90 transition-opacity">
+          <span class="text-3xl text-accent">N<span class="inline-block w-2.5 h-2.5 bg-accent translate-x-0.5 -translate-y-0.5"></span></span>
+          <span class="ml-2 tracking-tight">Nossa Inscrição<span class="text-accent">.</span></span>
         </a>
 
         <!-- Navigation Links -->
         <nav class="hidden md:flex items-center space-x-8 text-sm font-medium tracking-wide">
-          <a href="/" class="text-zinc-400 hover:text-white transition-colors duration-200">Eventos</a>
-          {userId && <a href="/painel" class="text-zinc-400 hover:text-white transition-colors duration-200">Minhas Inscrições</a>}
+          <a href="/" class="text-ink-muted hover:text-ink transition-colors duration-200">Eventos</a>
+          {userId && <a href="/painel" class="text-ink-muted hover:text-ink transition-colors duration-200">Minhas Inscrições</a>}
           
           {userId ? (
             userRole === 'PARTICIPANT' ? (
-              <a href="/painel-organizador" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
-                <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+              <a href="/painel-organizador" class="text-ink-muted hover:text-ink transition-colors duration-200 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 bg-accent rounded-none"></span>
                 Traga seu evento
               </a>
             ) : userRole === 'ADMIN' ? (
-              <a href="/admin/dashboard" class="text-emerald-400 hover:text-emerald-300 transition-colors duration-200 flex items-center gap-1.5">
-                <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+              <a href="/admin/dashboard" class="text-accent hover:opacity-80 transition-opacity duration-200 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 bg-accent rounded-none"></span>
                 Painel Geral
               </a>
             ) : (
-              <a href="/painel-organizador" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
-                <span class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+              <a href="/painel-organizador" class="text-ink-muted hover:text-ink transition-colors duration-200 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 bg-accent rounded-none"></span>
                 Painel Organizador
               </a>
             )
           ) : (
-            <a href="/sign-in" class="text-zinc-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
-              <span class="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+            <a href="/sign-in" class="text-ink-muted hover:text-ink transition-colors duration-200 flex items-center gap-1.5">
+              <span class="inline-block w-1.5 h-1.5 bg-accent rounded-none"></span>
               Traga seu evento
             </a>
           )}
@@ -99,14 +116,24 @@ if (userId) {
 
         <!-- Clerk Auth Actions -->
         <div class="flex items-center space-x-4">
+          <!-- Theme Toggle -->
+          <button id="theme-toggle" class="p-2 text-ink-muted hover:text-ink transition-colors cursor-pointer" aria-label="Alternar tema">
+            <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          </button>
+
           {userId ? (
             <>
               <!-- Link do Painel visivel no mobile -->
-              <a href="/painel" class="md:hidden text-xs text-zinc-400 hover:text-white">Inscrições</a>
+              <a href="/painel" class="md:hidden text-xs text-ink-muted hover:text-ink">Inscrições</a>
               <UserButton />
             </>
           ) : (
-            <div class="bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs px-4 py-2 uppercase tracking-widest font-semibold cursor-pointer transition-all duration-200">
+            <div class="bg-surface-alt border border-ink-muted/30 text-ink hover:bg-surface text-xs px-4 py-2 uppercase tracking-widest font-semibold cursor-pointer transition-all duration-200">
               <SignInButton mode="modal" />
             </div>
           )}
@@ -120,17 +147,42 @@ if (userId) {
     </main>
 
     <!-- Footer -->
-    <footer class="w-full bg-[#08090c] border-t border-zinc-900 py-8 text-center text-xs text-zinc-600 font-medium tracking-widest uppercase">
+    <footer class="w-full bg-surface-alt border-t border-ink-muted/20 py-8 text-center text-xs text-ink-muted font-medium tracking-widest uppercase">
       <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div>&copy; {new Date().getFullYear()} SYNCFLOW. TODOS OS DIREITOS RESERVADOS.</div>
+        <div>&copy; {new Date().getFullYear()} NOSSA INSCRIÇÃO. TODOS OS DIREITOS RESERVADOS.</div>
         <div class="flex items-center space-x-6 text-[10px]">
-          <a href="/termos" class="hover:text-zinc-400 transition-colors">Termos</a>
-          <a href="/privacidade" class="hover:text-zinc-400 transition-colors">Privacidade</a>
-          <a href="/suporte" class="hover:text-zinc-400 transition-colors">Suporte</a>
+          <a href="/termos" class="hover:text-ink transition-colors">Termos</a>
+          <a href="/privacidade" class="hover:text-ink transition-colors">Privacidade</a>
+          <a href="/suporte" class="hover:text-ink transition-colors">Suporte</a>
         </div>
       </div>
     </footer>
     <CyberDialog />
+    
+    <script>
+      const themeToggle = document.getElementById('theme-toggle');
+      const lightIcon = document.getElementById('theme-icon-light');
+      const darkIcon = document.getElementById('theme-icon-dark');
+
+      function updateIcons() {
+        if (document.documentElement.classList.contains('dark')) {
+          lightIcon?.classList.remove('hidden');
+          darkIcon?.classList.add('hidden');
+        } else {
+          lightIcon?.classList.add('hidden');
+          darkIcon?.classList.remove('hidden');
+        }
+      }
+
+      // Inicializa ícones
+      updateIcons();
+
+      themeToggle?.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        updateIcons();
+      });
+    </script>
   </body>
 </html>
 
