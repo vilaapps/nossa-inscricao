@@ -19,7 +19,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       where: { id: userId },
     });
 
-    if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
+    const isSuperAdmin = user?.role === 'ADMIN' || user?.email === 'nossainscricao@gmail.com';
+
+    if (!user || (!isSuperAdmin && user.role !== 'ORGANIZER')) {
       return new Response(JSON.stringify({ message: 'Acesso negado. Apenas organizadores ou administradores podem editar eventos.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
@@ -82,21 +84,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
+    const isAdmin = user.role === 'ADMIN' || user.email === 'nossainscricao@gmail.com';
+
     // Validar tenant
-    if (user.role === 'ORGANIZER' && event.tenantId !== user.tenantId) {
+    if (!isAdmin && user.role === 'ORGANIZER' && event.tenantId !== user.tenantId) {
       return new Response(JSON.stringify({ message: 'Acesso negado. Você só pode editar eventos da sua organização.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // Validar status DRAFT ou REJECTED
-    if (event.status !== 'DRAFT' && event.status !== 'REJECTED') {
-      return new Response(JSON.stringify({ message: 'Acesso negado. Eventos aprovados não podem ser editados.' }), {
+    // Validar status DRAFT ou REJECTED (se não for super admin)
+    if (!isAdmin && event.status !== 'DRAFT' && event.status !== 'REJECTED') {
+      return new Response(JSON.stringify({ message: 'Acesso negado. Eventos aprovados não podem ser editados por organizadores.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    // Determinar status final do evento (se admin estiver editando evento publicado, mantém PUBLISHED)
+    const targetStatus = (isAdmin && event.status === 'PUBLISHED') ? 'PUBLISHED' : 'DRAFT';
 
     // Gerar slug a partir do título
     const slug = title
@@ -123,11 +130,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // Executar atualização em transação para garantir atomicidade das categorias/lotes
     await prisma.$transaction(async (tx) => {
-      // 1. Deletar categorias e lotes existentes
-      await tx.category.deleteMany({ where: { eventId } });
-      await tx.batch.deleteMany({ where: { eventId } });
-
-      // 2. Atualizar o evento e criar novas categorias/lotes
+      // 1. Atualizar dados básicos do evento
       await tx.event.update({
         where: { id: eventId },
         data: {
@@ -144,28 +147,117 @@ export const POST: APIRoute = async ({ request, locals }) => {
           trailerUrl: trailerUrl || null,
           contractText: contractText || null,
           contractPdf: contractPdf || null,
-          status: 'DRAFT', // Reseta o status para rascunho
+          status: targetStatus,
           rejectionReason: null, // Limpa o motivo da rejeição
           rejectedAt: null, // Limpa a data de rejeição
-          categories: {
-            create: categories.map((cat: any) => ({
-              name: cat.name,
-              gender: cat.gender || 'MISTO',
-              price: 0,
-              availableSlots: Number(cat.slots || availableSlots),
-              tenantId: event.tenantId,
-            })),
-          },
-          batches: {
-            create: batches.map((bat: any, index: number) => ({
-              name: bat.name,
-              price: bat.price.toString(),
-              active: index === 0, // Primeiro lote ativo por padrão
-              tenantId: event.tenantId,
-            })),
-          },
         },
       });
+
+      // 2. Tratar categorias e lotes preservando integridade referencial se houver inscrições
+      const existingRegistrations = await tx.registration.findMany({
+        where: { eventId },
+        select: { categoryId: true, batchId: true },
+      });
+
+      const usedCategoryIds = new Set(existingRegistrations.map((r) => r.categoryId));
+      const usedBatchIds = new Set(existingRegistrations.map((r) => r.batchId));
+
+      if (existingRegistrations.length === 0) {
+        // Sem inscrições existentes: recriação total segura
+        await tx.category.deleteMany({ where: { eventId } });
+        await tx.batch.deleteMany({ where: { eventId } });
+
+        await tx.category.createMany({
+          data: categories.map((cat: any) => ({
+            name: cat.name,
+            gender: cat.gender || 'MISTO',
+            price: 0,
+            availableSlots: Number(cat.slots || availableSlots),
+            tenantId: event.tenantId,
+            eventId,
+          })),
+        });
+
+        await tx.batch.createMany({
+          data: batches.map((bat: any, index: number) => ({
+            name: bat.name,
+            price: bat.price.toString(),
+            active: index === 0,
+            tenantId: event.tenantId,
+            eventId,
+          })),
+        });
+      } else {
+        // Existem inscrições: atualizar e proteger registros referenciados
+        const currentCategories = await tx.category.findMany({ where: { eventId } });
+        const currentBatches = await tx.batch.findMany({ where: { eventId } });
+
+        const incomingCategoryIds = new Set(categories.map((c: any) => c.id).filter(Boolean));
+        const incomingBatchIds = new Set(batches.map((b: any) => b.id).filter(Boolean));
+
+        // Deletar categorias não recebidas que não tenham inscrições
+        for (const cat of currentCategories) {
+          if (!incomingCategoryIds.has(cat.id) && !usedCategoryIds.has(cat.id)) {
+            await tx.category.delete({ where: { id: cat.id } });
+          }
+        }
+
+        // Atualizar ou criar categorias
+        for (const cat of categories) {
+          if (cat.id && currentCategories.some((c) => c.id === cat.id)) {
+            await tx.category.update({
+              where: { id: cat.id },
+              data: {
+                name: cat.name,
+                gender: cat.gender || 'MISTO',
+                availableSlots: Number(cat.slots || availableSlots),
+              },
+            });
+          } else {
+            await tx.category.create({
+              data: {
+                name: cat.name,
+                gender: cat.gender || 'MISTO',
+                price: 0,
+                availableSlots: Number(cat.slots || availableSlots),
+                tenantId: event.tenantId,
+                eventId,
+              },
+            });
+          }
+        }
+
+        // Deletar lotes não recebidos que não tenham inscrições
+        for (const bat of currentBatches) {
+          if (!incomingBatchIds.has(bat.id) && !usedBatchIds.has(bat.id)) {
+            await tx.batch.delete({ where: { id: bat.id } });
+          }
+        }
+
+        // Atualizar ou criar lotes
+        for (let index = 0; index < batches.length; index++) {
+          const bat = batches[index];
+          if (bat.id && currentBatches.some((b) => b.id === bat.id)) {
+            await tx.batch.update({
+              where: { id: bat.id },
+              data: {
+                name: bat.name,
+                price: bat.price.toString(),
+              },
+            });
+          } else {
+            await tx.batch.create({
+              data: {
+                name: bat.name,
+                price: bat.price.toString(),
+                active: index === 0,
+                tenantId: event.tenantId,
+                eventId,
+              },
+            });
+          }
+        }
+      }
     });
 
     return new Response(JSON.stringify({ success: true, eventId }), {

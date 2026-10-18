@@ -11,10 +11,11 @@ if (!eventId) {
 
 const prisma = new PrismaClient();
 
-// Buscar o evento com as categorias e lotes ativos
+// Buscar o evento com as categorias, lotes ativos e tenant
 const event = await prisma.event.findFirst({
   where: { id: eventId, status: 'PUBLISHED' },
   include: {
+    tenant: true,
     categories: true,
     batches: {
       where: { active: true },
@@ -28,7 +29,17 @@ if (!event) {
   return Astro.redirect('/404');
 }
 
-// Serializar explicitamente os lotes para evitar que o tipo Decimal do Prisma quebre na serialização Astro/React
+// Taxa administrativa do parceiro (padrão 10%)
+const commissionRate = Number(event.tenant?.commissionRate || 10);
+
+// Serializar explicitamente categorias e lotes para garantir integridade na fronteira Astro/React
+const serializedCategories = event.categories.map(cat => ({
+  id: cat.id,
+  name: cat.name,
+  gender: cat.gender,
+  availableSlots: cat.availableSlots,
+}));
+
 const serializedBatches = event.batches.map(batch => ({
   id: batch.id,
   name: batch.name,
@@ -39,15 +50,15 @@ const serializedBatches = event.batches.map(batch => ({
 
 <BaseLayout title={`Inscrição — ${event.title}`}>
   <!-- Cabeçalho HUD Simplificado -->
-  <section class="bg-[#08090c] border-b border-zinc-900 py-8 px-6">
-    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-[10px] tracking-widest text-zinc-500 gap-2">
-      <a href={`/eventos/${event.slug}`} class="hover:text-emerald-400 transition-colors uppercase flex items-center gap-1.5 mb-2">
+  <section class="bg-surface border-b border-ink-muted/20 py-8 px-6">
+    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
+      <a href={`/eventos/${event.slug}`} class="hover:text-accent transition-colors uppercase flex items-center gap-1.5 mb-2">
         &larr; Cancelar e voltar para o evento
       </a>
       <div class="flex items-center gap-4">
-        <span class="text-emerald-400 font-bold">FLUXO DE RESERVA DE VAGA</span>
-        <span class="text-zinc-700">|</span>
-        <span class="text-zinc-400 font-semibold">{event.title}</span>
+        <span class="text-accent font-bold">FLUXO DE RESERVA DE VAGA</span>
+        <span class="text-ink-muted">|</span>
+        <span class="text-ink font-semibold">{event.title}</span>
       </div>
     </div>
   </section>
@@ -58,8 +69,9 @@ const serializedBatches = event.batches.map(batch => ({
       client:load
       eventId={event.id}
       eventTitle={event.title}
-      categories={event.categories}
+      categories={serializedCategories}
       batches={serializedBatches}
+      commissionRate={commissionRate}
     />
   </section>
 </BaseLayout>

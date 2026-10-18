@@ -61,6 +61,14 @@ if (!user) {
   }
 }
 
+// Auto-promoção do Super Admin se necessário
+if (user.email === 'nossainscricao@gmail.com' && user.role !== 'ADMIN') {
+  user = await prisma.user.update({
+    where: { id: user.id },
+    data: { role: 'ADMIN' },
+  });
+}
+
 // Apenas ADMIN pode acessar esta rota — redirecionar outros roles
 if (user.role !== 'ADMIN') {
   await prisma.$disconnect();
@@ -123,7 +131,9 @@ events.forEach(event => {
     if (reg.paymentStatus === 'PAID' || reg.status === 'CONFIRMED') {
       const val = Number(reg.amountPaid);
       adminStats.totalRevenueGlobal += val;
-      adminStats.totalCommissionsGlobal += val * rate;
+      // Taxa administrativa adicionada no preço: parcela da plataforma = val - (val / (1 + rate))
+      const subtotal = val / (1 + rate);
+      adminStats.totalCommissionsGlobal += (val - subtotal);
       adminStats.confirmedRegistrationsGlobal++;
     }
   });
@@ -132,14 +142,14 @@ events.forEach(event => {
 
 <BaseLayout title="Painel Geral de Moderação">
   <!-- TELA DO SUPER ADMIN (PLATAFORMA) -->
-  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+  <section class="bg-surface border-b border-ink-muted/20 py-12 px-6">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
       <div>
-        <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+        <div class="text-xs uppercase tracking-widest text-accent mb-2 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></span>
           Super Admin Geral da Plataforma // {user.email}
         </div>
-        <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+        <h1 class="font-heading text-3xl font-extrabold uppercase text-ink tracking-wider">
           Painel Geral
         </h1>
       </div>
@@ -149,63 +159,63 @@ events.forEach(event => {
   <section class="max-w-7xl mx-auto px-6 py-12 space-y-12 flex-grow w-full font-mono text-xs">
     <!-- Grid de Métricas Globais HUD -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Faturamento Bruto Geral</div>
-        <div class="text-3xl font-bold text-white mt-2">
+      <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+        <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Faturamento Bruto Geral</div>
+        <div class="text-3xl font-bold text-ink mt-2">
           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adminStats.totalRevenueGlobal)}
         </div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">Volume transacionado no Asaas</div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        <div class="text-[11px] text-ink-muted uppercase mt-2">Volume transacionado no Asaas</div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
       </div>
 
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Comissões da Plataforma</div>
-        <div class="text-3xl font-bold text-emerald-400 mt-2">
+      <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+        <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Taxa Administrativa (Plataforma)</div>
+        <div class="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adminStats.totalCommissionsGlobal)}
         </div>
-        <div class="text-[9px] text-emerald-600 uppercase mt-2">Lucro retido pelas taxas</div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        <div class="text-[11px] text-emerald-600 dark:text-emerald-400 uppercase mt-2">Total arrecadado em taxa administrativa</div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
       </div>
 
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Inscrições Globais</div>
-        <div class="text-3xl font-bold text-white mt-2">
-          {adminStats.confirmedRegistrationsGlobal} <span class="text-xs text-zinc-500">/ {adminStats.totalRegistrationsGlobal}</span>
+      <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+        <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Inscrições Globais</div>
+        <div class="text-3xl font-bold text-ink mt-2">
+          {adminStats.confirmedRegistrationsGlobal} <span class="text-xs text-ink-muted">/ {adminStats.totalRegistrationsGlobal}</span>
         </div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">Inscrições pagas vs solicitadas</div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        <div class="text-[11px] text-ink-muted uppercase mt-2">Inscrições pagas vs solicitadas</div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
       </div>
 
-      <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-        <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Eventos Publicados</div>
-        <div class="text-3xl font-bold text-blue-400 mt-2">
+      <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+        <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Eventos Publicados</div>
+        <div class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
           {adminStats.activeEventsCount}
         </div>
-        <div class="text-[9px] text-zinc-600 uppercase mt-2">Competições ativas no ar</div>
-        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+        <div class="text-[11px] text-ink-muted uppercase mt-2">Competições ativas no ar</div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
       </div>
     </div>
 
     <!-- Área de Moderação de Eventos Pendentes -->
     <div class="space-y-6">
-      <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4 flex items-center gap-2">
+      <h3 class="font-heading text-lg font-bold text-ink uppercase tracking-wider border-b border-ink-muted/20 pb-4 flex items-center gap-2">
         <span>Moderação de Eventos</span>
         {pendingEvents.length > 0 && (
-          <span class="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] px-2 py-0.5 font-mono tracking-normal animate-pulse">
+          <span class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs px-2.5 py-0.5 font-mono tracking-normal animate-pulse font-bold">
             {pendingEvents.length} Pendentes
           </span>
         )}
       </h3>
 
       {pendingEvents.length === 0 ? (
-        <div class="bg-[#15171f] border border-zinc-800 p-8 text-center text-zinc-500 uppercase">
+        <div class="bg-surface-alt border border-ink-muted/20 p-8 text-center text-ink-muted uppercase shadow-sm">
           Nenhum evento aguardando moderação no momento.
         </div>
       ) : (
-        <div class="border border-zinc-800 overflow-x-auto">
-          <table class="w-full text-left border-collapse">
+        <div class="border border-ink-muted/20 overflow-x-auto shadow-sm">
+          <table class="w-full text-left border-collapse font-mono">
             <thead>
-              <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+              <tr class="bg-surface text-ink-muted border-b border-ink-muted/20 text-xs uppercase tracking-wider">
                 <th class="p-4">Evento / Competição</th>
                 <th class="p-4">Organização (Tenant)</th>
                 <th class="p-4">Data da Prova</th>
@@ -213,32 +223,38 @@ events.forEach(event => {
                 <th class="p-4 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+            <tbody class="divide-y divide-ink-muted/10 bg-surface-alt text-xs">
               {pendingEvents.map((event) => (
-                <tr class="hover:bg-[#1a1c25] transition-colors">
-                  <td class="p-4 font-bold text-zinc-200 uppercase">{event.title}</td>
-                  <td class="p-4 text-zinc-400 uppercase">{event.tenant.name}</td>
-                  <td class="p-4 text-zinc-400">
+                <tr class="hover:bg-surface/50 transition-colors">
+                  <td class="p-4 font-bold text-ink uppercase">{event.title}</td>
+                  <td class="p-4 text-ink-muted uppercase">{event.tenant.name}</td>
+                  <td class="p-4 text-ink-muted">
                     {new Date(event.date).toLocaleDateString('pt-BR')} {new Date(event.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </td>
-                  <td class="p-4 text-center text-zinc-300">{event.availableSlots}</td>
+                  <td class="p-4 text-center text-ink font-semibold">{event.availableSlots}</td>
                   <td class="p-4 text-center">
                     <div class="flex items-center justify-center gap-2">
                       <a
                         href={`/admin/eventos/${event.id}`}
-                        class="border border-zinc-800 hover:border-zinc-700 text-blue-400 hover:text-blue-300 text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors"
+                        class="border border-blue-500/30 hover:border-blue-500 text-blue-600 dark:text-blue-400 text-xs uppercase px-4 py-2 font-extrabold tracking-wider transition-colors"
                       >
                         Ver Detalhes
                       </a>
+                      <a
+                        href={`/painel-organizador/eventos/editar?id=${event.id}`}
+                        class="border border-ink-muted/30 hover:border-ink-muted text-ink-muted hover:text-ink text-xs uppercase px-4 py-2 font-extrabold tracking-wider transition-colors"
+                      >
+                        Editar
+                      </a>
                       <button
                         onclick={`aprovarEvento('${event.id}')`}
-                        class="bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors cursor-pointer"
+                        class="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-4 py-2 font-extrabold tracking-wider transition-colors cursor-pointer"
                       >
                         Aprovar
                       </button>
                       <button
                         onclick={`reprovarEvento('${event.id}')`}
-                        class="bg-red-500 hover:bg-red-600 text-white text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors cursor-pointer"
+                        class="bg-red-500 hover:bg-red-600 text-white text-xs uppercase px-4 py-2 font-extrabold tracking-wider transition-colors cursor-pointer"
                       >
                         Reprovar
                       </button>
@@ -254,54 +270,60 @@ events.forEach(event => {
 
     <!-- Todos os Eventos da Plataforma -->
     <div class="space-y-6">
-      <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
+      <h3 class="font-heading text-lg font-bold text-ink uppercase tracking-wider border-b border-ink-muted/20 pb-4">
         Todos os Eventos da Plataforma
       </h3>
 
       {events.length === 0 ? (
-        <div class="bg-[#15171f] border border-zinc-800 p-8 text-center text-zinc-500 uppercase">
+        <div class="bg-surface-alt border border-ink-muted/20 p-8 text-center text-ink-muted uppercase shadow-sm">
           Nenhum evento na plataforma.
         </div>
       ) : (
-        <div class="border border-zinc-800 overflow-x-auto">
-          <table class="w-full text-left border-collapse">
+        <div class="border border-ink-muted/20 overflow-x-auto shadow-sm">
+          <table class="w-full text-left border-collapse font-mono">
             <thead>
-              <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+              <tr class="bg-surface text-ink-muted border-b border-ink-muted/20 text-xs uppercase tracking-wider">
                 <th class="p-4">Evento</th>
                 <th class="p-4">Status</th>
                 <th class="p-4 text-center">Inscrições</th>
                 <th class="p-4 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+            <tbody class="divide-y divide-ink-muted/10 bg-surface-alt text-xs">
               {events.map((event) => {
                 const hasRegistrations = event.registrations.some((r: any) => r.status === 'CONFIRMED' || r.paymentStatus === 'PAID');
                 
                 return (
-                  <tr class="hover:bg-[#1a1c25] transition-colors">
-                    <td class="p-4 font-bold text-zinc-200 uppercase">{event.title}</td>
-                    <td class="p-4 text-zinc-400 font-mono text-[10px]">{event.status}</td>
-                    <td class="p-4 text-center text-zinc-300">
+                  <tr class="hover:bg-surface/50 transition-colors">
+                    <td class="p-4 font-bold text-ink uppercase">{event.title}</td>
+                    <td class="p-4 text-ink-muted font-mono text-xs font-semibold">{event.status}</td>
+                    <td class="p-4 text-center text-ink font-semibold">
                       {event.registrations.length}
                     </td>
                     <td class="p-4 text-center">
                       <div class="flex items-center justify-center gap-2">
                         <a
                           href={`/admin/eventos/${event.id}`}
-                          class="border border-zinc-800 hover:border-zinc-700 text-blue-400 hover:text-blue-300 text-[10px] uppercase px-4 py-2 font-extrabold tracking-wider transition-colors"
+                          class="border border-blue-500/30 hover:border-blue-500 text-blue-600 dark:text-blue-400 text-xs uppercase px-3.5 py-1.5 font-extrabold tracking-wider transition-colors"
                         >
                           Ver
                         </a>
+                        <a
+                          href={`/painel-organizador/eventos/editar?id=${event.id}`}
+                          class="border border-ink-muted/30 hover:border-ink-muted text-ink-muted hover:text-ink text-xs uppercase px-3.5 py-1.5 font-extrabold tracking-wider transition-colors"
+                        >
+                          Editar
+                        </a>
                         <button
                           onclick={`arquivarEventoGlobal('${event.id}')`}
-                          class="border border-amber-500/30 text-amber-500 hover:bg-amber-500/10 text-[10px] uppercase px-3 py-1 font-extrabold tracking-wider transition-colors cursor-pointer"
+                          class="border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-xs uppercase px-3.5 py-1.5 font-extrabold tracking-wider transition-colors cursor-pointer"
                         >
                           Arquivar
                         </button>
                         {!hasRegistrations && (
                           <button
                             onclick={`excluirEventoGlobal('${event.id}')`}
-                            class="bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-500 text-[10px] uppercase px-3 py-1 font-extrabold tracking-wider transition-colors cursor-pointer"
+                            class="bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs uppercase px-3.5 py-1.5 font-extrabold tracking-wider transition-colors cursor-pointer"
                           >
                             Excluir
                           </button>
@@ -317,29 +339,29 @@ events.forEach(event => {
       )}
     </div>
 
-    <!-- Configuração de Tenants e Comissões -->
+    <!-- Configuração de Tenants e Taxa Administrativa -->
     <div class="space-y-6">
-      <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
-        Parceiros / Taxas de Comissão
+      <h3 class="font-heading text-lg font-bold text-ink uppercase tracking-wider border-b border-ink-muted/20 pb-4">
+        Parceiros / Taxa Administrativa
       </h3>
 
-      <div class="border border-zinc-800 overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+      <div class="border border-ink-muted/20 overflow-x-auto shadow-sm">
+        <table class="w-full text-left border-collapse font-mono">
           <thead>
-            <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+            <tr class="bg-surface text-ink-muted border-b border-ink-muted/20 text-xs uppercase tracking-wider">
               <th class="p-4">Organização (Tenant)</th>
               <th class="p-4">ID do Tenant</th>
               <th class="p-4 text-center">E-mail do Responsável</th>
-              <th class="p-4 text-center">Taxa de Comissão (%)</th>
+              <th class="p-4 text-center">Taxa Administrativa (%)</th>
               <th class="p-4 text-center">Ações</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+          <tbody class="divide-y divide-ink-muted/10 bg-surface-alt text-xs">
             {allTenants.map((item) => (
-              <tr class="hover:bg-[#1a1c25] transition-colors">
-                <td class="p-4 font-bold text-zinc-200 uppercase">{item.name}</td>
-                <td class="p-4 text-zinc-500 font-mono">{item.id}</td>
-                <td class="p-4 text-center text-zinc-400">{item.users[0]?.email || 'Não cadastrado'}</td>
+              <tr class="hover:bg-surface/50 transition-colors">
+                <td class="p-4 font-bold text-ink uppercase">{item.name}</td>
+                <td class="p-4 text-ink-muted font-mono">{item.id}</td>
+                <td class="p-4 text-center text-ink-muted">{item.users[0]?.email || 'Não cadastrado'}</td>
                 <td class="p-4 text-center w-48">
                   <div class="flex items-center justify-center gap-2">
                     <input
@@ -349,15 +371,15 @@ events.forEach(event => {
                       min="0"
                       max="100"
                       value={Number(item.commissionRate)}
-                      class="w-20 bg-[#0d0e12] border border-zinc-800 text-zinc-300 text-center px-2 py-1.5 outline-none focus:border-emerald-500 transition-colors"
+                      class="w-20 bg-surface border border-ink-muted/30 text-ink text-center px-2 py-1.5 outline-none focus:border-accent transition-colors"
                     />
-                    <span class="text-zinc-500">%</span>
+                    <span class="text-ink-muted">%</span>
                   </div>
                 </td>
                 <td class="p-4 text-center">
                   <button
                     onclick={`salvarComissao('${item.id}')`}
-                    class="border border-zinc-700 hover:border-emerald-500 text-zinc-400 hover:text-emerald-400 text-[10px] uppercase px-4 py-2 font-bold tracking-wider transition-colors cursor-pointer"
+                    class="border border-ink-muted/30 hover:border-accent text-ink-muted hover:text-accent text-xs uppercase px-4 py-2 font-bold tracking-wider transition-colors cursor-pointer"
                   >
                     Salvar Taxa
                   </button>
@@ -451,6 +473,8 @@ events.forEach(event => {
       } catch (err) {
         await window.cyberAlert(err.message, 'SYSTEM_ERROR', 'error');
       }
+    }
+
     async function arquivarEventoGlobal(eventId) {
       if (!await window.cyberConfirm('Deseja realmente arquivar este evento?')) return;
       try {

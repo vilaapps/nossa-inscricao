@@ -226,11 +226,11 @@ describe('Registration Processor', () => {
     });
     expect(updateRegSpy).toHaveBeenCalledWith({
       where: { id: 'reg_1' },
-      data: {
+      data: expect.objectContaining({
         status: 'PENDING',
         amountPaid: 100.00,
         couponId: null,
-      },
+      }),
     });
 
     expect(mockQueue.add).toHaveBeenCalledWith('process-payment', {
@@ -440,11 +440,11 @@ describe('Registration Processor', () => {
     });
     expect(updateRegSpy).toHaveBeenCalledWith({
       where: { id: 'reg_1' },
-      data: {
+      data: expect.objectContaining({
         status: 'PENDING',
         amountPaid: 85.00, // 100 - 15%
         couponId: 'coup_123',
-      },
+      }),
     });
   });
 
@@ -507,11 +507,11 @@ describe('Registration Processor', () => {
     // Assert
     expect(updateRegSpy).toHaveBeenCalledWith({
       where: { id: 'reg_1' },
-      data: {
+      data: expect.objectContaining({
         status: 'PENDING',
         amountPaid: 0, // Minimo zero
         couponId: 'coup_123',
-      },
+      }),
     });
   });
 
@@ -576,11 +576,11 @@ describe('Registration Processor', () => {
     // Deve ignorar o cupom e cobrar o valor cheio
     expect(updateRegSpy).toHaveBeenCalledWith({
       where: { id: 'reg_1' },
-      data: {
+      data: expect.objectContaining({
         status: 'PENDING',
         amountPaid: 100.00,
         couponId: null,
-      },
+      }),
     });
   });
 
@@ -728,5 +728,151 @@ describe('Registration Processor', () => {
 
     // Assert
     expect(getQueue(QueueName.EMAIL).add).toHaveBeenCalled();
+  });
+
+  // deve calcular taxa administrativa e acrescer ao valor final pago (Taxa de Conveniência/Administrativa)
+  it('should calculate administrative fee and add to amountPaid and payment queue amount', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_fee_1',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_1',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = { id: 'evt_1', availableSlots: 10, title: 'Corrida Ficticia' };
+    const mockCategory = { id: 'cat_1', availableSlots: 5 };
+    const mockBatch = { id: 'bat_1', price: 100.00, maxQuantity: 20, soldQuantity: 10 };
+    const mockReg = {
+      id: 'reg_fee_1',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX', cpf: '12345678900' },
+      user: { email: 'participant@test.com', name: 'John Doe' },
+    };
+
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 10.00 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert: Lote R$ 100 + 10% Taxa Administrativa = R$ 110
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_fee_1' },
+      data: {
+        status: 'PENDING',
+        amountPaid: 110.00,
+        couponId: null,
+        metadata: {
+          paymentMethod: 'PIX',
+          cpf: '12345678900',
+          subtotal: 100.00,
+          adminFee: 10.00,
+          commissionRate: 10.00,
+        },
+      },
+    });
+
+    expect(mockQueue.add).toHaveBeenCalledWith('process-payment', expect.objectContaining({
+      registrationId: 'reg_fee_1',
+      amount: 110.00,
+    }));
+  });
+
+  // deve calcular taxa administrativa sobre o valor com desconto de cupom (Decisão P0.2 - Opção A)
+  it('should calculate administrative fee on discounted coupon price (Decision P0.2 - Option A)', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_fee_coupon',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_1',
+      tenantId: 'ten_1',
+      couponCode: 'DESC20',
+    });
+
+    const mockEvent = { id: 'evt_1', availableSlots: 10, title: 'Corrida Ficticia' };
+    const mockCategory = { id: 'cat_1', availableSlots: 5 };
+    const mockBatch = { id: 'bat_1', price: 100.00, maxQuantity: 20, soldQuantity: 10 };
+    const mockCoupon = { id: 'cupom_20', discountType: 'PERCENTAGE', discountValue: 20.00, maxUses: 10, usedCount: 0 };
+    const mockReg = {
+      id: 'reg_fee_coupon',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX', cpf: '12345678900' },
+      user: { email: 'participant@test.com', name: 'John Doe' },
+    };
+
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        coupon: {
+          findFirst: vi.fn().mockResolvedValueOnce(mockCoupon),
+          update: vi.fn(),
+        },
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 10.00 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert: Lote R$ 100 - 20% = R$ 80 subtotal. Taxa 10% de R$ 80 = R$ 8. Total pago = R$ 88.
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_fee_coupon' },
+      data: {
+        status: 'PENDING',
+        amountPaid: 88.00,
+        couponId: 'cupom_20',
+        metadata: {
+          paymentMethod: 'PIX',
+          cpf: '12345678900',
+          subtotal: 80.00,
+          adminFee: 8.00,
+          commissionRate: 10.00,
+        },
+      },
+    });
+
+    expect(mockQueue.add).toHaveBeenCalledWith('process-payment', expect.objectContaining({
+      registrationId: 'reg_fee_coupon',
+      amount: 88.00,
+    }));
   });
 });

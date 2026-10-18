@@ -19,9 +19,10 @@ interface RegistrationFormProps {
   eventTitle: string;
   categories: Category[];
   batches: Batch[];
+  commissionRate?: number;
 }
 
-export default function RegistrationForm({ eventId, eventTitle, categories, batches }: RegistrationFormProps) {
+export default function RegistrationForm({ eventId, eventTitle, categories, batches, commissionRate = 10 }: RegistrationFormProps) {
   const [step, setStep] = useState(1);
 
   // Passo 1: Categoria e Lote
@@ -149,7 +150,10 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
   };
 
   const basePrice = activeBatch ? Number(activeBatch.price) : 0;
-  const finalPrice = Math.max(0, basePrice - (basePrice * (couponDiscount / 100)));
+  const discountValue = basePrice * (couponDiscount / 100);
+  const subtotal = Math.max(0, basePrice - discountValue);
+  const adminFee = (subtotal * (commissionRate / 100));
+  const finalPrice = subtotal + adminFee;
 
   // Obter token JWT do Clerk
   const getClerkToken = async () => {
@@ -349,23 +353,23 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
   };
 
   return (
-    <div className="w-full bg-[#15171f] border border-zinc-800 p-6 md:p-8 relative">
+    <div className="w-full bg-surface-alt border border-ink-muted/20 shadow-sm p-6 md:p-8 relative">
       {/* Canto decorativo HUD */}
-      <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-ink-muted/30 pointer-events-none"></div>
 
       {/* Barra de Progresso HUD */}
-      <div className="mb-8 font-mono text-[10px] tracking-widest text-zinc-500 flex items-center justify-between border-b border-zinc-800/60 pb-4">
-        <div className="flex items-center gap-6">
-          <span className={step === 1 ? 'text-emerald-400 font-bold' : 'text-zinc-600'}>01 // CATEGORIA</span>
-          <span className={step === 2 ? 'text-emerald-400 font-bold' : 'text-zinc-600'}>02 // DADOS ATLETA</span>
-          <span className={step === 3 ? 'text-emerald-400 font-bold' : 'text-zinc-600'}>03 // REVISÃO</span>
-          <span className={step === 4 ? 'text-emerald-400 font-bold' : 'text-zinc-600'}>04 // CHECKOUT</span>
+      <div className="mb-8 font-mono text-xs md:text-sm tracking-widest text-ink-muted flex items-center justify-between border-b border-ink-muted/20 pb-4">
+        <div className="flex items-center gap-4 md:gap-6 flex-wrap">
+          <span className={step === 1 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>01 // CATEGORIA</span>
+          <span className={step === 2 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>02 // DADOS ATLETA</span>
+          <span className={step === 3 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>03 // REVISÃO</span>
+          <span className={step === 4 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>04 // CHECKOUT</span>
         </div>
-        <div className="text-zinc-400">PASSO {step} DE 4</div>
+        <div className="text-ink-muted font-bold">PASSO {step} DE 4</div>
       </div>
 
       {submissionError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-500 dark:text-red-400 text-sm font-mono p-4 mb-6 uppercase flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>
           {submissionError}
         </div>
@@ -375,15 +379,15 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">{eventTitle}</h2>
-            <p className="text-zinc-400 text-xs mt-1">Selecione a modalidade/categoria oficial em que deseja competir.</p>
+            <h2 className="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider">{eventTitle}</h2>
+            <p className="text-ink-muted text-sm mt-1">Selecione a modalidade/categoria oficial em que deseja competir.</p>
           </div>
 
           <div className="space-y-3">
             {categories.map((cat) => (
               <label
                 key={cat.id}
-                className={`flex items-center gap-4 bg-[#0d0e12] border p-4 cursor-pointer transition-all duration-200 ${selectedCategoryId === cat.id ? 'border-emerald-500/60 bg-emerald-500/[0.02]' : 'border-zinc-800 hover:border-zinc-700'
+                className={`flex items-center gap-4 bg-surface border p-4 md:p-5 cursor-pointer transition-all duration-200 ${selectedCategoryId === cat.id ? 'border-emerald-500/60 bg-emerald-500/[0.05]' : 'border-ink-muted/20 hover:border-ink-muted/40'
                   }`}
               >
                 <input
@@ -392,23 +396,23 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                   value={cat.id}
                   checked={selectedCategoryId === cat.id}
                   onChange={() => setSelectedCategoryId(cat.id)}
-                  className="accent-emerald-500 w-4 h-4 bg-zinc-950 border-zinc-800"
+                  className="accent-emerald-500 w-5 h-5 bg-surface border-ink-muted/30 cursor-pointer"
                 />
-                <div className="flex-grow font-sans text-xs">
-                  <div className="text-zinc-100 font-bold uppercase tracking-wide text-sm">{cat.name}</div>
-                  <div className="text-[10px] text-zinc-500 font-mono mt-1">GÊNERO: {cat.gender} | VAGAS RESTANTES: {cat.availableSlots}</div>
+                <div className="flex-grow font-sans">
+                  <div className="text-ink font-bold uppercase tracking-wide text-base">{cat.name}</div>
+                  <div className="text-xs text-ink-muted font-mono mt-1">GÊNERO: {cat.gender} | VAGAS RESTANTES: {cat.availableSlots}</div>
                 </div>
               </label>
             ))}
           </div>
 
-          <div className="pt-6 border-t border-zinc-800/60 flex justify-end">
+          <div className="pt-6 border-t border-ink-muted/20 flex justify-end">
             <button
               onClick={() => setStep(2)}
               disabled={!selectedCategoryId}
-              className="bg-emerald-500 hover:bg-emerald-600 text-black font-mono text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
+              className="bg-emerald-500 hover:bg-emerald-600 text-black font-mono text-sm uppercase px-8 py-4 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
             >
-              Próximo Passo;
+              Próximo Passo &rarr;
             </button>
           </div>
         </div>
@@ -418,13 +422,13 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
       {step === 2 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">Identificação do Atleta</h2>
-            <p className="text-zinc-400 text-xs mt-1">Precisamos do seu CPF e telefone para faturamento do PIX e emissão da vaga.</p>
+            <h2 className="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider">Identificação do Atleta</h2>
+            <p className="text-ink-muted text-sm mt-1">Precisamos do seu CPF e telefone para faturamento do PIX e emissão da vaga.</p>
           </div>
 
-          <div className="space-y-4 font-mono text-xs">
+          <div className="space-y-5 font-mono">
             <div className="space-y-2">
-              <label htmlFor="cpf" className="text-[10px] uppercase text-zinc-400 block tracking-wider">CPF do Participante</label>
+              <label htmlFor="cpf" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">CPF do Participante</label>
               <input
                 type="text"
                 id="cpf"
@@ -432,12 +436,12 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                 placeholder="000.000.000-00"
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
-                className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3.5 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-ink-muted/50"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="phone" className="text-[10px] uppercase text-zinc-400 block tracking-wider">Celular / WhatsApp</label>
+              <label htmlFor="phone" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Celular / WhatsApp</label>
               <input
                 type="text"
                 id="phone"
@@ -445,17 +449,17 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                 placeholder="(21) 99999-9999"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3.5 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-ink-muted/50"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="shirt" className="text-[10px] uppercase text-zinc-400 block tracking-wider">Tamanho da Camiseta do Kit</label>
+              <label htmlFor="shirt" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Tamanho da Camiseta do Kit</label>
               <select
                 id="shirt"
                 value={shirtSize}
                 onChange={(e) => setShirtSize(e.target.value)}
-                className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+                className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3.5 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
               >
                 <option value="P">P — PEQUENO</option>
                 <option value="M">M — MÉDIO</option>
@@ -465,19 +469,19 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
             </div>
           </div>
 
-          <div className="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
+          <div className="pt-6 border-t border-ink-muted/20 flex items-center justify-between font-mono">
             <button
               onClick={() => setStep(1)}
-              className="border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-xs uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
+              className="border border-ink-muted/30 hover:border-ink-muted text-ink-muted hover:text-ink text-xs md:text-sm uppercase px-6 py-3.5 tracking-widest font-semibold transition-all duration-200 cursor-pointer"
             >
               &larr; Voltar
             </button>
             <button
               onClick={() => setStep(3)}
               disabled={!cpf.trim() || !phone.trim()}
-              className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
+              className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs md:text-sm uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
             >
-              Próximo Passo;
+              Próximo Passo &rarr;
             </button>
           </div>
         </div>
@@ -487,46 +491,53 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
       {step === 3 && (
         <form onSubmit={handleSubmitRegistration} className="space-y-6">
           <div>
-            <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">Revisão do Pedido</h2>
-            <p className="text-zinc-400 text-xs mt-1">Revise suas escolhas e aplique cupons promocionais se houver.</p>
+            <h2 className="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider">Revisão do Pedido</h2>
+            <p className="text-ink-muted text-sm mt-1">Revise suas escolhas e aplique cupons promocionais se houver.</p>
           </div>
 
-          <div className="bg-[#0d0e12] border border-zinc-800 p-4 font-mono text-xs space-y-4">
-            <div className="flex justify-between border-b border-zinc-800/50 pb-2">
-              <span className="text-zinc-500 uppercase">Evento</span>
-              <span className="text-zinc-200 font-bold">{eventTitle}</span>
+          <div className="bg-surface border border-ink-muted/20 p-5 font-mono space-y-4">
+            <div className="flex justify-between border-b border-ink-muted/20 pb-3 text-sm md:text-base">
+              <span className="text-ink-muted uppercase">Evento</span>
+              <span className="text-ink font-bold">{eventTitle}</span>
             </div>
-            <div className="flex justify-between border-b border-zinc-800/50 pb-2">
-              <span className="text-zinc-500 uppercase">Categoria</span>
-              <span className="text-zinc-200">
+            <div className="flex justify-between border-b border-ink-muted/20 pb-3 text-sm md:text-base">
+              <span className="text-ink-muted uppercase">Categoria</span>
+              <span className="text-ink font-semibold">
                 {categories.find(c => c.id === selectedCategoryId)?.name}
               </span>
             </div>
-            <div className="flex justify-between border-b border-zinc-800/50 pb-2">
-              <span className="text-zinc-500 uppercase">Camiseta</span>
-              <span className="text-zinc-200">Camiseta Oficial (Tamanho {shirtSize})</span>
+            <div className="flex justify-between border-b border-ink-muted/20 pb-3 text-sm md:text-base">
+              <span className="text-ink-muted uppercase">Camiseta</span>
+              <span className="text-ink font-semibold">Camiseta Oficial (Tamanho {shirtSize})</span>
             </div>
-            <div className="flex justify-between pb-1 text-sm pt-2">
-              <span className="text-zinc-400 uppercase font-semibold">Valor da Inscrição</span>
-              <span className="text-zinc-200 font-bold">{formatPrice(basePrice)}</span>
+            <div className="flex justify-between pb-1 text-sm md:text-base pt-2">
+              <span className="text-ink-muted uppercase font-semibold">Valor da Inscrição</span>
+              <span className="text-ink font-bold">{formatPrice(basePrice)}</span>
             </div>
 
             {couponDiscount > 0 && (
-              <div className="flex justify-between pb-1 text-xs text-emerald-400 border-t border-zinc-900 pt-2">
+              <div className="flex justify-between pb-1 text-sm text-emerald-600 dark:text-emerald-400 border-t border-ink-muted/20 pt-2 font-semibold">
                 <span>Desconto Cupom ({couponDiscount}%)</span>
-                <span>-{formatPrice(basePrice * (couponDiscount / 100))}</span>
+                <span>-{formatPrice(discountValue)}</span>
               </div>
             )}
 
-            <div className="flex justify-between pb-1 text-base font-bold border-t border-zinc-800 pt-4 text-white">
+            {commissionRate > 0 && (
+              <div className="flex justify-between pb-1 text-sm text-ink-muted border-t border-ink-muted/20 pt-2 font-semibold">
+                <span>Taxa Administrativa ({commissionRate}%)</span>
+                <span className="text-ink font-bold">+{formatPrice(adminFee)}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between pb-1 text-base md:text-lg font-bold border-t border-ink-muted/20 pt-4 text-ink">
               <span className="uppercase">TOTAL A PAGAR</span>
-              <span className="text-emerald-400">{formatPrice(finalPrice)}</span>
+              <span className="text-emerald-600 dark:text-emerald-400 text-lg md:text-xl">{formatPrice(finalPrice)}</span>
             </div>
           </div>
 
           {/* Seção do Cupom */}
-          <div className="border border-zinc-800 p-4 space-y-3 font-mono">
-            <label htmlFor="coupon" className="text-[10px] uppercase text-zinc-400 block tracking-wider">Possui Cupom de Desconto?</label>
+          <div className="border border-ink-muted/20 p-5 space-y-3 font-mono">
+            <label htmlFor="coupon" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Possui Cupom de Desconto?</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -534,168 +545,168 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                 placeholder="EX: RIO10"
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value)}
-                className="bg-[#0d0e12] border border-zinc-800 text-zinc-300 text-xs px-3 py-2 flex-grow outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                className="bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 flex-grow outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-ink-muted/50"
               />
               <button
                 type="button"
                 onClick={handleApplyCoupon}
                 disabled={isApplyingCoupon || !couponCode.trim()}
-                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs uppercase px-4 py-2 hover:bg-zinc-800 transition-all cursor-pointer disabled:opacity-50"
+                className="bg-surface border border-ink-muted/30 text-ink text-xs md:text-sm uppercase px-5 py-3 hover:bg-surface-alt transition-all cursor-pointer font-bold disabled:opacity-50"
               >
                 {isApplyingCoupon ? 'VALIDANDO...' : 'APLICAR'}
               </button>
             </div>
-            {couponError && <p className="text-[10px] text-red-500 uppercase">{couponError}</p>}
-            {couponSuccess && <p className="text-[10px] text-emerald-400 uppercase">{couponSuccess}</p>}
+            {couponError && <p className="text-xs text-red-500 uppercase">{couponError}</p>}
+            {couponSuccess && <p className="text-xs text-emerald-600 dark:text-emerald-400 uppercase">{couponSuccess}</p>}
           </div>
 
           {/* Método de Pagamento */}
-          <div className="border border-zinc-800 p-4 space-y-4 font-mono">
-            <label className="text-[10px] uppercase text-zinc-400 block tracking-wider">Forma de Pagamento</label>
+          <div className="border border-ink-muted/20 p-5 space-y-4 font-mono">
+            <label className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Forma de Pagamento</label>
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setPaymentMethod('PIX')}
-                className={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${paymentMethod === 'PIX'
-                  ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
-                  : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
+                className={`flex flex-col items-center justify-center p-4 md:p-5 border text-center transition-all cursor-pointer ${paymentMethod === 'PIX'
+                  ? 'border-emerald-500/60 bg-emerald-500/[0.05] text-ink'
+                  : 'border-ink-muted/20 bg-surface text-ink-muted hover:border-ink-muted/40'
                   }`}
               >
-                <span className="text-xs font-bold uppercase tracking-wide">PIX</span>
-                <span className="text-[9px] text-zinc-500 mt-1">Confirmação em instantes</span>
+                <span className="text-sm md:text-base font-bold uppercase tracking-wide">PIX</span>
+                <span className="text-xs text-ink-muted mt-1">Confirmação em instantes</span>
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod('CREDIT_CARD')}
-                className={`flex flex-col items-center justify-center p-4 border text-center transition-all cursor-pointer ${paymentMethod === 'CREDIT_CARD'
-                  ? 'border-emerald-500/60 bg-emerald-500/[0.02] text-white'
-                  : 'border-zinc-800 bg-[#0d0e12] text-zinc-400 hover:border-zinc-700'
+                className={`flex flex-col items-center justify-center p-4 md:p-5 border text-center transition-all cursor-pointer ${paymentMethod === 'CREDIT_CARD'
+                  ? 'border-emerald-500/60 bg-emerald-500/[0.05] text-ink'
+                  : 'border-ink-muted/20 bg-surface text-ink-muted hover:border-ink-muted/40'
                   }`}
               >
-                <span className="text-xs font-bold uppercase tracking-wide">Cartão de Crédito</span>
-                <span className="text-[9px] text-zinc-500 mt-1">Aprovação imediata</span>
+                <span className="text-sm md:text-base font-bold uppercase tracking-wide">Cartão de Crédito</span>
+                <span className="text-xs text-ink-muted mt-1">Aprovação imediata</span>
               </button>
             </div>
 
             {paymentMethod === 'CREDIT_CARD' && (
-              <div className="space-y-4 pt-4 border-t border-zinc-800/60 text-xs">
+              <div className="space-y-4 pt-4 border-t border-ink-muted/20">
                 {/* Número do Cartão */}
-                <div className="space-y-1">
-                  <label htmlFor="cardNumber" className="text-[9px] uppercase text-zinc-400 block tracking-wider">Número do Cartão</label>
+                <div className="space-y-1.5">
+                  <label htmlFor="cardNumber" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Número do Cartão</label>
                   <input
                     type="text"
                     id="cardNumber"
                     placeholder="0000 0000 0000 0000"
                     value={cardNumber}
                     onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                    className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                    className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-ink-muted/50 font-mono"
                   />
                 </div>
 
                 {/* Nome no Cartão */}
-                <div className="space-y-1">
-                  <label htmlFor="cardHolderName" className="text-[9px] uppercase text-zinc-400 block tracking-wider">Nome Impresso no Cartão</label>
+                <div className="space-y-1.5">
+                  <label htmlFor="cardHolderName" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Nome Impresso no Cartão</label>
                   <input
                     type="text"
                     id="cardHolderName"
                     placeholder="JOÃO S SILVA"
                     value={cardHolderName}
                     onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
-                    className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                    className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-ink-muted/50 font-mono"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   {/* Validade */}
-                  <div className="space-y-1">
-                    <label htmlFor="cardExpiry" className="text-[9px] uppercase text-zinc-400 block tracking-wider">Validade (MM/AA)</label>
+                  <div className="space-y-1.5">
+                    <label htmlFor="cardExpiry" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">Validade (MM/AA)</label>
                     <input
                       type="text"
                       id="cardExpiry"
                       placeholder="MM/AA"
                       value={cardExpiry}
                       onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                      className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                      className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-ink-muted/50 font-mono"
                     />
                   </div>
 
                   {/* CVV */}
-                  <div className="space-y-1">
-                    <label htmlFor="cardCcv" className="text-[9px] uppercase text-zinc-400 block tracking-wider">CVV</label>
+                  <div className="space-y-1.5">
+                    <label htmlFor="cardCcv" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">CVV</label>
                     <input
                       type="text"
                       id="cardCcv"
                       placeholder="123"
                       value={cardCcv}
                       onChange={(e) => setCardCcv(e.target.value.replace(/\D/g, '').substring(0, 4))}
-                      className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                      className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-ink-muted/50 font-mono"
                     />
                   </div>
                 </div>
 
                 {/* Checkbox Mesmos Dados do Participante */}
-                <label className="flex gap-2 items-center select-none cursor-pointer font-sans text-[10px] text-zinc-400">
+                <label className="flex gap-2.5 items-center select-none cursor-pointer font-sans text-xs md:text-sm text-ink-muted">
                   <input
                     type="checkbox"
                     checked={sameAsParticipant}
                     onChange={(e) => setSameAsParticipant(e.target.checked)}
-                    className="accent-emerald-500 w-3 h-3 bg-zinc-950 border-zinc-800"
+                    className="accent-emerald-500 w-4 h-4 bg-surface border-ink-muted/30 cursor-pointer"
                   />
                   <span>Os dados cadastrais do titular são os mesmos do participante</span>
                 </label>
 
                 {/* Se não for o mesmo participante, exibir CPF do Titular */}
                 {!sameAsParticipant && (
-                  <div className="space-y-1">
-                    <label htmlFor="cardHolderCpf" className="text-[9px] uppercase text-zinc-400 block tracking-wider">CPF do Titular do Cartão</label>
+                  <div className="space-y-1.5">
+                    <label htmlFor="cardHolderCpf" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">CPF do Titular do Cartão</label>
                     <input
                       type="text"
                       id="cardHolderCpf"
                       placeholder="000.000.000-00"
                       value={cardHolderCpf}
                       onChange={(e) => setCardHolderCpf(e.target.value)}
-                      className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                      className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-ink-muted/50 font-mono"
                     />
                   </div>
                 )}
 
                 {/* CEP do Titular (sempre obrigatório para validação cadastral) */}
-                <div className="space-y-1">
-                  <label htmlFor="cardHolderZipCode" className="text-[9px] uppercase text-zinc-400 block tracking-wider">CEP do Titular</label>
+                <div className="space-y-1.5">
+                  <label htmlFor="cardHolderZipCode" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">CEP do Titular</label>
                   <input
                     type="text"
                     id="cardHolderZipCode"
                     placeholder="00000-000"
                     value={cardHolderZipCode}
                     onChange={(e) => setCardHolderZipCode(formatZipCode(e.target.value))}
-                    className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800 font-mono"
+                    className="w-full bg-surface border border-ink-muted/30 text-ink text-base px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-ink-muted/50 font-mono"
                   />
                 </div>
               </div>
             )}
           </div>
 
-          <label className="flex gap-3 items-start select-none cursor-pointer font-sans text-[11px] text-zinc-500 leading-tight">
+          <label className="flex gap-3 items-start select-none cursor-pointer font-sans text-xs md:text-sm text-ink-muted leading-snug">
             <input
               type="checkbox"
               required
-              className="accent-emerald-500 w-3.5 h-3.5 mt-0.5 bg-zinc-950 border-zinc-800"
+              className="accent-emerald-500 w-4 h-4 mt-0.5 bg-surface border-ink-muted/30 cursor-pointer"
             />
             <span>Declaro que aceito as regras oficiais da competição e concordo em prosseguir com o pagamento no valor de {formatPrice(finalPrice)} via {paymentMethod === 'PIX' ? 'PIX' : 'Cartão de Crédito'}.</span>
           </label>
 
-          <div className="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
+          <div className="pt-6 border-t border-ink-muted/20 flex items-center justify-between font-mono">
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-xs uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
+              className="border border-ink-muted/30 hover:border-ink-muted text-ink-muted hover:text-ink text-xs md:text-sm uppercase px-6 py-3.5 tracking-widest font-semibold transition-all duration-200 cursor-pointer"
             >
               &larr; Voltar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
+              className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs md:text-sm uppercase px-8 py-4 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? 'PROCESSANDO INSCRIÇÃO...' : paymentMethod === 'PIX' ? 'FINALIZAR INSCRIÇÃO & GERAR PIX' : 'FINALIZAR INSCRIÇÃO & PAGAR COM CARTÃO'}
             </button>
@@ -709,10 +720,10 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
           {paymentStatus === 'PENDING' && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">
+                <h2 className="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider">
                   {paymentMethod === 'PIX' ? 'Inscrição Reservada com Sucesso!' : 'Processando Cobrança...'}
                 </h2>
-                <p className="text-zinc-500 text-xs mt-1">
+                <p className="text-ink-muted text-sm mt-1 max-w-md mx-auto leading-relaxed">
                   {paymentMethod === 'PIX'
                     ? 'Sua vaga está garantida por tempo limitado. Realize o pagamento do PIX abaixo.'
                     : 'Estamos validando e processando a transação do cartão de crédito no gateway.'
@@ -721,27 +732,27 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               </div>
 
               {paymentMethod === 'CREDIT_CARD' ? (
-                <div className="py-8 space-y-4 max-w-sm mx-auto border border-zinc-800 bg-[#0d0e12] p-6">
+                <div className="py-8 space-y-4 max-w-sm mx-auto border border-ink-muted/20 bg-surface p-6">
                   <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent animate-spin rounded-full mx-auto"></div>
-                  <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Aguardando autorização...</div>
-                  <p className="text-[9px] text-zinc-500 leading-relaxed uppercase">
+                  <div className="text-xs md:text-sm text-ink font-bold uppercase tracking-widest">Aguardando autorização...</div>
+                  <p className="text-xs text-ink-muted leading-relaxed uppercase">
                     Por favor, não feche ou recarregue esta página. Isso pode levar alguns segundos.
                   </p>
                 </div>
               ) : (
                 <>
                   {/* QR Code Container */}
-                  <div className="max-w-[200px] mx-auto bg-white p-3 aspect-square flex items-center justify-center border border-zinc-800">
+                  <div className="max-w-[220px] mx-auto bg-white p-3 aspect-square flex items-center justify-center border border-ink-muted/20 shadow-lg">
                     {pixQrCode ? (
                       // Usando uma imagem publica para gerar QR Code do valor copia e cola
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixQrCode)}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixQrCode)}`}
                         alt="QR Code PIX para pagamento"
                         className="w-full h-full object-contain"
                       />
                     ) : (
-                      <div className="text-zinc-400 text-[10px] uppercase flex flex-col items-center gap-2">
-                        <span className="w-5 h-5 border-2 border-zinc-400 border-t-transparent animate-spin rounded-full"></span>
+                      <div className="text-ink-muted text-xs uppercase flex flex-col items-center gap-2">
+                        <span className="w-6 h-6 border-2 border-ink-muted/50 border-t-transparent animate-spin rounded-full"></span>
                         Gerando QR Code...
                       </div>
                     )}
@@ -750,18 +761,18 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
                   {/* Pix Copia e Cola */}
                   {pixQrCode && (
                     <div className="space-y-2 text-left max-w-md mx-auto">
-                      <label htmlFor="pixCode" className="text-[10px] uppercase text-zinc-500 block tracking-wider">PIX Copia e Cola</label>
+                      <label htmlFor="pixCode" className="text-xs md:text-sm uppercase text-ink font-semibold block tracking-wider">PIX Copia e Cola</label>
                       <div className="flex">
                         <input
                           type="text"
                           id="pixCode"
                           readOnly
                           value={pixQrCode}
-                          className="bg-[#0d0e12] border border-zinc-800 text-zinc-400 text-xs px-3 py-2.5 outline-none flex-grow font-mono truncate"
+                          className="bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none flex-grow font-mono truncate"
                         />
                         <button
                           onClick={handleCopyPix}
-                          className="bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs px-4 py-2 hover:text-white transition-all cursor-pointer"
+                          className="bg-surface border border-ink-muted/30 hover:bg-surface-alt text-ink text-xs md:text-sm font-bold uppercase px-6 py-3 hover:text-accent transition-all cursor-pointer"
                         >
                           {copySuccess ? 'COPIADO!' : 'COPIAR'}
                         </button>
@@ -772,12 +783,12 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               )}
 
               {/* Loading Status */}
-              <div className="border-t border-zinc-800/60 pt-6 flex flex-col items-center gap-2 text-xs">
-                <span className="text-emerald-400 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span>
+              <div className="border-t border-ink-muted/20 pt-6 flex flex-col items-center gap-2 text-sm">
+                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2 font-semibold">
+                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
                   AGUARDANDO CONFIRMAÇÃO DE PAGAMENTO...
                 </span>
-                <span className="text-[10px] text-zinc-600 uppercase">Consultando gateway (Tentativa {pollingAttempts})</span>
+                <span className="text-xs text-ink-muted uppercase">Consultando gateway (Tentativa {pollingAttempts})</span>
               </div>
             </div>
           )}
@@ -785,27 +796,27 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
           {paymentStatus === 'PAID' && (
             <div className="py-8 space-y-6 flex flex-col items-center">
               {/* Animacao / Feedback de sucesso */}
-              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500 rounded-full flex items-center justify-center text-emerald-400 text-2xl font-bold animate-bounce">
+              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl font-bold animate-bounce">
                 ✓
               </div>
 
               <div>
-                <h2 className="font-heading text-2xl font-bold text-white uppercase tracking-wider">Inscrição Confirmada!</h2>
-                <p className="text-zinc-400 text-xs mt-2 max-w-sm mx-auto leading-relaxed">
+                <h2 className="font-heading text-2xl md:text-3xl font-bold text-ink uppercase tracking-wider">Inscrição Confirmada!</h2>
+                <p className="text-ink-muted text-sm md:text-base mt-2 max-w-md mx-auto leading-relaxed">
                   Seu pagamento foi aprovado pelo gateway de pagamento. Sua vaga está garantida e o kit (tamanho {shirtSize}) foi reservado.
                 </p>
               </div>
 
-              <div className="bg-[#0d0e12] border border-zinc-800/80 p-4 text-xs max-w-sm w-full text-left space-y-2">
-                <div className="flex justify-between text-zinc-500"><span className="uppercase">Inscrição ID</span><span className="text-zinc-300 font-bold">{registrationId.substring(0, 13)}...</span></div>
-                <div className="flex justify-between text-zinc-500"><span className="uppercase">Valor Pago</span><span className="text-emerald-400 font-bold">{formatPrice(amount || finalPrice)}</span></div>
-                <div className="flex justify-between text-zinc-500"><span className="uppercase">Status</span><span className="text-emerald-400 font-bold uppercase">Aprovado ({paymentMethod === 'PIX' ? 'PIX' : 'Cartão'})</span></div>
+              <div className="bg-surface border border-ink-muted/20 p-5 text-sm md:text-base max-w-md w-full text-left space-y-3 font-mono">
+                <div className="flex justify-between text-ink-muted"><span className="uppercase">Inscrição ID</span><span className="text-ink font-bold">{registrationId.substring(0, 13)}...</span></div>
+                <div className="flex justify-between text-ink-muted"><span className="uppercase">Valor Pago</span><span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatPrice(amount || finalPrice)}</span></div>
+                <div className="flex justify-between text-ink-muted"><span className="uppercase">Status</span><span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase">Aprovado ({paymentMethod === 'PIX' ? 'PIX' : 'Cartão'})</span></div>
               </div>
 
               <div className="pt-4">
                 <a
                   href="/painel"
-                  className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 inline-block"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs md:text-sm uppercase px-8 py-4 tracking-widest font-extrabold transition-all duration-200 inline-block cursor-pointer"
                 >
                   Ir para Meu Painel
                 </a>
@@ -820,10 +831,10 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               </div>
 
               <div>
-                <h2 className="font-heading text-2xl font-bold text-white uppercase tracking-wider">
+                <h2 className="font-heading text-2xl md:text-3xl font-bold text-ink uppercase tracking-wider">
                   {paymentMethod === 'PIX' ? 'Tempo Esgotado!' : 'Pagamento Recusado'}
                 </h2>
-                <p className="text-red-400 text-xs mt-2 max-w-sm mx-auto leading-relaxed font-sans">
+                <p className="text-red-500 dark:text-red-400 text-sm mt-2 max-w-md mx-auto leading-relaxed font-sans">
                   {paymentMethod === 'PIX'
                     ? 'O tempo limite para pagamento do PIX desta vaga expirou ou a inscrição foi cancelada pelo sistema.'
                     : 'A transação com o seu cartão de crédito foi recusada pelo gateway de pagamento. Verifique os dados ou tente outra forma de pagamento.'
@@ -834,7 +845,7 @@ export default function RegistrationForm({ eventId, eventTitle, categories, batc
               <div className="pt-4">
                 <button
                   onClick={() => setStep(3)}
-                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs uppercase px-8 py-3.5 tracking-widest font-bold transition-all duration-200 inline-block cursor-pointer border border-zinc-700"
+                  className="bg-surface hover:bg-surface-alt text-ink text-xs md:text-sm uppercase px-8 py-4 tracking-widest font-bold transition-all duration-200 inline-block cursor-pointer border border-ink-muted/30"
                 >
                   Tentar Novamente
                 </button>

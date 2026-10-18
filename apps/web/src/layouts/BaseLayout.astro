@@ -1,5 +1,5 @@
 ---
-import { UserButton, SignInButton } from '@clerk/astro/components';
+import { UserButton, SignInButton, SignUpButton } from '@clerk/astro/components';
 import { PrismaClient } from '@prisma/client';
 import CyberDialog from '../components/CyberDialog.astro';
 
@@ -107,7 +107,7 @@ if (userId) {
               </a>
             )
           ) : (
-            <a href="/sign-in" class="text-ink-muted hover:text-ink transition-colors duration-200 flex items-center gap-1.5">
+            <a href="/sign-in?redirect_url=/painel-organizador" class="text-ink-muted hover:text-ink transition-colors duration-200 flex items-center gap-1.5">
               <span class="inline-block w-1.5 h-1.5 bg-accent rounded-none"></span>
               Traga seu evento
             </a>
@@ -115,7 +115,7 @@ if (userId) {
         </nav>
 
         <!-- Clerk Auth Actions -->
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-3">
           <!-- Theme Toggle -->
           <button id="theme-toggle" class="p-2 text-ink-muted hover:text-ink transition-colors cursor-pointer" aria-label="Alternar tema">
             <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -133,8 +133,17 @@ if (userId) {
               <UserButton />
             </>
           ) : (
-            <div class="bg-surface-alt border border-ink-muted/30 text-ink hover:bg-surface text-xs px-4 py-2 uppercase tracking-widest font-semibold cursor-pointer transition-all duration-200">
-              <SignInButton mode="modal" />
+            <div class="flex items-center gap-2">
+              <SignInButton mode="modal" asChild>
+                <button class="text-ink-muted hover:text-ink text-xs uppercase tracking-widest font-semibold px-3 py-2 transition-colors cursor-pointer">
+                  Login
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal" asChild>
+                <button class="bg-accent hover:opacity-90 text-white text-xs uppercase tracking-widest font-bold px-4 py-2 transition-all cursor-pointer shadow-sm">
+                  Criar Conta
+                </button>
+              </SignUpButton>
             </div>
           )}
         </div>
@@ -150,7 +159,7 @@ if (userId) {
     <footer class="w-full bg-surface-alt border-t border-ink-muted/20 py-8 text-center text-xs text-ink-muted font-medium tracking-widest uppercase">
       <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>&copy; {new Date().getFullYear()} NOSSA INSCRIÇÃO. TODOS OS DIREITOS RESERVADOS.</div>
-        <div class="flex items-center space-x-6 text-[10px]">
+        <div class="flex items-center space-x-6 text-xs">
           <a href="/termos" class="hover:text-ink transition-colors">Termos</a>
           <a href="/privacidade" class="hover:text-ink transition-colors">Privacidade</a>
           <a href="/suporte" class="hover:text-ink transition-colors">Suporte</a>

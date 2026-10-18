@@ -109,7 +109,11 @@ if (isOrganizer) {
     event.registrations.forEach((reg: any) => {
       totalRegistrationsCount++;
       if (reg.paymentStatus === 'PAID' || reg.status === 'CONFIRMED') {
-        eventRevenue += Number(reg.amountPaid) * (1 - feeRate);
+        const metadataObj = reg.metadata ? (typeof reg.metadata === 'string' ? JSON.parse(reg.metadata) : reg.metadata) : {};
+        const organizerShare = metadataObj.subtotal !== undefined
+          ? Number(metadataObj.subtotal)
+          : (Number(reg.amountPaid) / (1 + feeRate));
+        eventRevenue += organizerShare;
         eventConfirmed++;
         confirmedRegistrationsCount++;
       } else if (reg.status === 'PENDING' || reg.status === 'QUEUED') {
@@ -166,54 +170,54 @@ const barGraphHeight = 160;
   
   {isParticipant && (
     <!-- TELA DE ONBOARDING: PARTICIPANTE -> ORGANIZADOR -->
-    <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
-      <div class="max-w-xl mx-auto font-mono text-[10px] tracking-widest text-zinc-500 text-center">
-        <span class="text-emerald-400 font-bold">PORTAL DE ORGANIZADORES</span>
-        <span class="text-zinc-700 mx-2">|</span>
-        <span class="text-zinc-400 font-semibold">CADASTRO DE PARCEIRO</span>
+    <section class="bg-surface border-b border-ink-muted/20 py-12 px-6">
+      <div class="max-w-xl mx-auto font-mono text-xs tracking-widest text-ink-muted text-center">
+        <span class="text-emerald-600 dark:text-emerald-400 font-bold">PORTAL DE ORGANIZADORES</span>
+        <span class="text-ink-muted/40 mx-2">|</span>
+        <span class="text-ink font-semibold">CADASTRO DE PARCEIRO</span>
       </div>
     </section>
 
     <section class="max-w-xl mx-auto px-6 py-20 flex-grow w-full font-mono">
-      <div class="bg-[#15171f] border border-zinc-800 p-8 relative">
-        <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+      <div class="bg-surface-alt border border-ink-muted/20 p-8 relative shadow-sm">
+        <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-ink-muted/20 pointer-events-none"></div>
         
         <div class="mb-8">
-          <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5 justify-center">
+          <div class="text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5 justify-center">
             <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
             Traga seu evento para o SyncFlow
           </div>
-          <h2 class="font-heading text-2xl font-extrabold text-white uppercase tracking-wider text-center">Seja um Organizador</h2>
-          <p class="text-zinc-500 text-xs mt-3 font-sans text-center leading-relaxed">
+          <h2 class="font-heading text-2xl font-extrabold text-ink uppercase tracking-wider text-center">Seja um Organizador</h2>
+          <p class="text-ink-muted text-xs mt-3 font-sans text-center leading-relaxed">
             Cadastre os dados de sua organização ou assessoria abaixo para liberar a criação de competições e venda de inscrições. Você continuará podendo participar de eventos como atleta com a mesma conta.
           </p>
         </div>
 
-        <form id="onboarding-form" class="space-y-6 text-xs text-zinc-400">
+        <form id="onboarding-form" class="space-y-6 text-xs text-ink-muted">
           <div class="space-y-2">
-            <label for="orgName" class="text-[10px] uppercase block tracking-wider font-bold">Nome da Organização / Assessoria</label>
+            <label for="orgName" class="text-xs uppercase block tracking-wider font-bold text-ink">Nome da Organização / Assessoria</label>
             <input
               type="text"
               id="orgName"
               required
               placeholder="EX: CORRIDA BRASIL ORGANIZAÇÕES"
-              class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+              class="w-full bg-surface border border-ink-muted/30 text-ink px-4 py-3 outline-none focus:border-accent transition-colors uppercase placeholder:text-ink-muted/40"
             />
           </div>
 
           <div class="space-y-2">
-            <label for="cpfCnpj" class="text-[10px] uppercase block tracking-wider font-bold">CPF ou CNPJ</label>
+            <label for="cpfCnpj" class="text-xs uppercase block tracking-wider font-bold text-ink">CPF ou CNPJ</label>
             <input
               type="text"
               id="cpfCnpj"
               required
               placeholder="EX: 00.000.000/0001-00"
-              class="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+              class="w-full bg-surface border border-ink-muted/30 text-ink px-4 py-3 outline-none focus:border-accent transition-colors uppercase placeholder:text-ink-muted/40"
             />
           </div>
 
-          <div id="error-message" class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 hidden uppercase"></div>
-          <div id="success-message" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 hidden uppercase flex items-center gap-2">
+          <div id="error-message" class="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-4 hidden uppercase"></div>
+          <div id="success-message" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 hidden uppercase flex items-center gap-2">
             <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
             Cadastro concluído! Redirecionando...
           </div>
@@ -277,14 +281,14 @@ const barGraphHeight = 160;
   {isOrganizer && (
     <!-- TELA DO ORGANIZADOR DA COMPETIÇÃO (TENANT ESPECÍFICO) -->
     <!-- Top Title HUD -->
-    <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+    <section class="bg-surface border-b border-ink-muted/20 py-12 px-6">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
         <div>
-          <div class="text-[10px] uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+          <div class="text-xs uppercase tracking-widest text-accent mb-2 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></span>
             Painel Organizador // {tenant?.name}
           </div>
-          <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+          <h1 class="font-heading text-3xl font-extrabold uppercase text-ink tracking-wider">
             Dashboard Geral
           </h1>
         </div>
@@ -303,42 +307,42 @@ const barGraphHeight = 160;
     <section class="max-w-7xl mx-auto px-6 py-12 space-y-12 flex-grow w-full">
       <!-- Grid de Métricas HUD -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-mono">
-        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Faturamento Líquido</div>
-          <div class="text-3xl font-bold text-white mt-2">
+        <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+          <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Receita do Organizador</div>
+          <div class="text-3xl font-bold text-ink mt-2">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenue)}
           </div>
-          <div class="text-[9px] text-emerald-500 uppercase mt-2">Taxa retida de {tenant?.commissionRate || 10}% inclusa</div>
-          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+          <div class="text-[11px] text-emerald-600 dark:text-emerald-400 uppercase mt-2">Repasse integral (Taxa administrativa transferida ao participante)</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
         </div>
 
-        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Total de Inscrições</div>
-          <div class="text-3xl font-bold text-white mt-2">{totalRegistrationsCount}</div>
-          <div class="text-[9px] text-zinc-600 uppercase mt-2">
-            <span class="text-emerald-400 font-bold">{confirmedRegistrationsCount}</span> pagas // <span class="text-amber-500 font-bold">{pendingRegistrationsCount}</span> pendentes
+        <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+          <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Total de Inscrições</div>
+          <div class="text-3xl font-bold text-ink mt-2">{totalRegistrationsCount}</div>
+          <div class="text-[11px] text-ink-muted uppercase mt-2">
+            <span class="text-emerald-600 dark:text-emerald-400 font-bold">{confirmedRegistrationsCount}</span> pagas // <span class="text-amber-500 font-bold">{pendingRegistrationsCount}</span> pendentes
           </div>
-          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
         </div>
 
-        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Taxa de Conversão</div>
-          <div class="text-3xl font-bold text-emerald-400 mt-2">
+        <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+          <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Taxa de Conversão</div>
+          <div class="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
             {conversionRate.toFixed(1)}%
           </div>
-          <div class="text-[9px] text-zinc-600 uppercase mt-2">Porcentagem de inscrições pagas</div>
-          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+          <div class="text-[11px] text-ink-muted uppercase mt-2">Porcentagem de inscrições pagas</div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
         </div>
 
-        <div class="bg-[#15171f] border border-zinc-800 p-5 relative">
-          <div class="text-[10px] text-zinc-500 uppercase tracking-wider">Vagas Ocupadas</div>
-          <div class="text-3xl font-bold text-blue-400 mt-2">
+        <div class="bg-surface-alt border border-ink-muted/20 p-5 relative shadow-sm">
+          <div class="text-xs text-ink-muted uppercase tracking-wider font-semibold">Vagas Ocupadas</div>
+          <div class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
             {occupancyGlobal.toFixed(1)}%
           </div>
-          <div class="text-[9px] text-zinc-600 uppercase mt-2">
+          <div class="text-[11px] text-ink-muted uppercase mt-2">
             {confirmedRegistrationsCount} vagas preenchidas de {totalSlotsGlobal}
           </div>
-          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-zinc-800"></div>
+          <div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-ink-muted/20"></div>
         </div>
       </div>
 
@@ -346,10 +350,10 @@ const barGraphHeight = 160;
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <!-- Gráfico de Rosca SVG: Ocupação das Vagas -->
-        <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px]">
+        <div class="bg-surface-alt border border-ink-muted/20 p-6 flex flex-col justify-between h-[340px] shadow-sm">
           <div class="font-mono">
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Ocupação Global de Vagas</h3>
-            <p class="text-zinc-500 text-[10px] uppercase mt-1">Status de reservas em lotes ativos</p>
+            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Ocupação Global de Vagas</h3>
+            <p class="text-ink-muted text-xs uppercase mt-1">Status de reservas em lotes ativos</p>
           </div>
 
           <div class="relative flex items-center justify-center py-6">
@@ -359,7 +363,7 @@ const barGraphHeight = 160;
                 cx="72"
                 cy="72"
                 r={r}
-                class="stroke-zinc-800"
+                class="stroke-zinc-200 dark:stroke-zinc-800"
                 stroke-width="12"
                 fill="transparent"
               />
@@ -377,40 +381,40 @@ const barGraphHeight = 160;
               />
             </svg>
             <div class="absolute inset-0 flex flex-col items-center justify-center font-mono">
-              <span class="text-2xl font-bold text-white">{occupancyGlobal.toFixed(0)}%</span>
-              <span class="text-[8px] text-zinc-500 uppercase tracking-wider">Vagas Preenchidas</span>
+              <span class="text-2xl font-bold text-ink">{occupancyGlobal.toFixed(0)}%</span>
+              <span class="text-[11px] text-ink-muted uppercase tracking-wider">Vagas Preenchidas</span>
             </div>
           </div>
 
-          <div class="flex items-center justify-between text-[10px] font-mono border-t border-zinc-800/60 pt-4">
+          <div class="flex items-center justify-between text-xs font-mono border-t border-ink-muted/20 pt-4">
             <div class="flex items-center gap-1.5">
               <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-              <span class="text-zinc-400">Pagas: {confirmedRegistrationsCount}</span>
+              <span class="text-ink font-medium">Pagas: {confirmedRegistrationsCount}</span>
             </div>
             <div class="flex items-center gap-1.5">
-              <span class="w-2 h-2 bg-zinc-800 rounded-full"></span>
-              <span class="text-zinc-500">Restantes: {Math.max(0, totalSlotsGlobal - confirmedRegistrationsCount)}</span>
+              <span class="w-2 h-2 bg-zinc-300 dark:bg-zinc-700 rounded-full"></span>
+              <span class="text-ink-muted">Restantes: {Math.max(0, totalSlotsGlobal - confirmedRegistrationsCount)}</span>
             </div>
           </div>
         </div>
 
         <!-- Gráfico de Barras SVG: Faturamento por Evento -->
-        <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between h-[340px] lg:col-span-2">
+        <div class="bg-surface-alt border border-ink-muted/20 p-6 flex flex-col justify-between h-[340px] lg:col-span-2 shadow-sm">
           <div class="font-mono">
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Faturamento Líquido por Evento</h3>
-            <p class="text-zinc-500 text-[10px] uppercase mt-1">Valores expressos em moeda nacional</p>
+            <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Faturamento Líquido por Evento</h3>
+            <p class="text-ink-muted text-xs uppercase mt-1">Valores expressos em moeda nacional</p>
           </div>
 
           <div class="relative w-full h-[180px] flex items-end pt-4 font-mono">
             {eventStats.length === 0 ? (
-              <div class="w-full text-center text-zinc-600 text-xs py-8 uppercase">Nenhum evento registrado</div>
+              <div class="w-full text-center text-ink-muted text-xs py-8 uppercase">Nenhum evento registrado</div>
             ) : (
-              <div class="w-full h-full flex items-end justify-around border-b border-zinc-800 pb-2">
+              <div class="w-full h-full flex items-end justify-around border-b border-ink-muted/20 pb-2">
                 {eventStats.map((item) => {
                   const barHeight = (item.revenue / maxRevenue) * barGraphHeight;
                   return (
                     <div class="flex flex-col items-center w-full group relative">
-                      <div class="absolute -top-8 bg-zinc-950 border border-zinc-800 text-emerald-400 px-2 py-0.5 text-[9px] rounded-sm hidden group-hover:block transition-all shadow-xl">
+                      <div class="absolute -top-8 bg-surface-alt border border-ink-muted/20 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 text-[11px] rounded-sm hidden group-hover:block transition-all shadow-xl font-bold">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.revenue)}
                       </div>
                       
@@ -419,7 +423,7 @@ const barGraphHeight = 160;
                         class="w-12 bg-emerald-500/20 border-t-2 border-emerald-500 hover:bg-emerald-500/30 transition-all duration-300 relative"
                       ></div>
                       
-                      <span class="text-[8px] text-zinc-500 uppercase mt-2 max-w-[80px] truncate text-center block font-semibold">
+                      <span class="text-[11px] text-ink-muted uppercase mt-2 max-w-[80px] truncate text-center block font-semibold">
                         {item.title.split(' ')[0]} {item.title.split(' ')[1] || ''}
                       </span>
                     </div>
@@ -429,7 +433,7 @@ const barGraphHeight = 160;
             )}
           </div>
 
-          <div class="text-[9px] text-zinc-600 uppercase font-mono border-t border-zinc-800/60 pt-4">
+          <div class="text-[11px] text-ink-muted uppercase font-mono border-t border-ink-muted/20 pt-4">
             * Passe o cursor do mouse sobre a coluna correspondente para visualizar o faturamento líquido.
           </div>
         </div>
@@ -437,14 +441,14 @@ const barGraphHeight = 160;
 
       <!-- Lista Detalhada de Eventos com Ocupação HUD -->
       <div class="space-y-6">
-        <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider border-b border-zinc-800 pb-4">
+        <h3 class="font-heading text-lg font-bold text-ink uppercase tracking-wider border-b border-ink-muted/20 pb-4">
           Controle de Competições
         </h3>
 
-        <div class="border border-zinc-800 overflow-x-auto">
+        <div class="border border-ink-muted/20 overflow-x-auto shadow-sm">
           <table class="w-full text-left font-mono text-xs border-collapse">
             <thead>
-              <tr class="bg-[#0d0e12] text-zinc-500 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+              <tr class="bg-surface text-ink-muted border-b border-ink-muted/20 text-xs uppercase tracking-wider">
                 <th class="p-4">Competição</th>
                 <th class="p-4">Status</th>
                 <th class="p-4">Data Prova</th>
@@ -454,59 +458,59 @@ const barGraphHeight = 160;
                 <th class="p-4 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-900 bg-[#15171f]">
+            <tbody class="divide-y divide-ink-muted/10 bg-surface-alt">
               {eventStats.map((item) => (
-                <tr class="hover:bg-[#1a1c25] transition-colors">
-                  <td class="p-4 font-bold text-zinc-200 uppercase">{item.title}</td>
+                <tr class="hover:bg-surface/50 transition-colors">
+                  <td class="p-4 font-bold text-ink uppercase">{item.title}</td>
                   <td class="p-4">
                     {item.status === 'DRAFT' && (
-                      <span class="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[9px] uppercase px-2 py-0.5 font-bold tracking-wider block w-fit">
+                      <span class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[11px] uppercase px-2.5 py-1 font-bold tracking-wider block w-fit">
                         Aguardando Aprovação
                       </span>
                     )}
                     {item.status === 'PUBLISHED' && (
-                      <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] uppercase px-2 py-0.5 font-bold tracking-wider block w-fit">
+                      <span class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] uppercase px-2.5 py-1 font-bold tracking-wider block w-fit">
                         Publicado
                       </span>
                     )}
                     {item.status === 'REJECTED' && (
                       <div>
-                        <span class="bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] uppercase px-2 py-0.5 font-bold tracking-wider block w-fit">
+                        <span class="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-[11px] uppercase px-2.5 py-1 font-bold tracking-wider block w-fit">
                           Reprovado
                         </span>
-                        <p class="text-[9px] text-zinc-500 mt-1 uppercase max-w-[150px] truncate" title={item.rejectionReason}>
+                        <p class="text-[11px] text-ink-muted mt-1 uppercase max-w-[150px] truncate" title={item.rejectionReason}>
                           Motivo: {item.rejectionReason}
                         </p>
                       </div>
                     )}
                     {item.status === 'ARCHIVED' && (
-                      <span class="bg-zinc-800 border border-zinc-700 text-zinc-400 text-[9px] uppercase px-2 py-0.5 font-bold tracking-wider block w-fit">
+                      <span class="bg-surface border border-ink-muted/30 text-ink-muted text-[11px] uppercase px-2.5 py-1 font-bold tracking-wider block w-fit">
                         Arquivado
                       </span>
                     )}
                   </td>
-                  <td class="p-4 text-zinc-400 font-medium">
+                  <td class="p-4 text-ink-muted font-medium">
                     {new Date(item.date).toLocaleDateString('pt-BR')}
                   </td>
-                  <td class="p-4 text-center font-mono text-[11px]">
-                    <span class="text-emerald-400 font-bold">{item.confirmed}</span>
-                    <span class="text-zinc-600 mx-0.5">/</span>
-                    <span class="text-zinc-300">{item.confirmed + item.pending}</span>
-                    <span class="text-zinc-600 mx-0.5">/</span>
-                    <span class="text-blue-400 font-bold">{Math.max(0, item.slots - item.confirmed)}</span>
+                  <td class="p-4 text-center font-mono text-xs">
+                    <span class="text-emerald-600 dark:text-emerald-400 font-bold">{item.confirmed}</span>
+                    <span class="text-ink-muted/40 mx-0.5">/</span>
+                    <span class="text-ink">{item.confirmed + item.pending}</span>
+                    <span class="text-ink-muted/40 mx-0.5">/</span>
+                    <span class="text-blue-600 dark:text-blue-400 font-bold">{Math.max(0, item.slots - item.confirmed)}</span>
                   </td>
-                  <td class="p-4 text-center text-emerald-400 font-bold">
+                  <td class="p-4 text-center text-emerald-600 dark:text-emerald-400 font-bold">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.revenue)}
                   </td>
                   <td class="p-4 w-64">
                     <div class="flex items-center gap-3">
-                      <div class="flex-grow h-2 bg-zinc-950 border border-zinc-800 rounded-none overflow-hidden relative">
+                      <div class="flex-grow h-2 bg-surface border border-ink-muted/20 rounded-none overflow-hidden relative">
                         <div
                           style={`width: ${item.occupancy}%`}
                           class="h-full bg-blue-500 transition-all duration-500"
                         ></div>
                       </div>
-                      <span class="text-[10px] text-zinc-400 w-8">{item.occupancy.toFixed(0)}%</span>
+                      <span class="text-xs text-ink-muted w-8">{item.occupancy.toFixed(0)}%</span>
                     </div>
                   </td>
                   <td class="p-4 text-center">
@@ -514,7 +518,7 @@ const barGraphHeight = 160;
                       {(item.status === 'DRAFT' || item.status === 'REJECTED') && (
                         <a
                           href={`/painel-organizador/eventos/editar?id=${item.id}`}
-                          class="border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-[10px] px-3 py-1.5 uppercase font-bold tracking-wider transition-colors"
+                          class="border border-ink-muted/30 hover:border-ink-muted text-ink-muted hover:text-ink text-xs px-3.5 py-1.5 uppercase font-bold tracking-wider transition-colors"
                         >
                           Editar
                         </a>
@@ -522,7 +526,7 @@ const barGraphHeight = 160;
                       {(item.status === 'PUBLISHED' || item.status === 'ARCHIVED') && (
                         <a
                           href={`/painel-organizador/eventos/visualizar?id=${item.id}`}
-                          class="border border-zinc-800 hover:border-zinc-700 text-blue-400 hover:text-blue-300 text-[10px] px-3 py-1.5 uppercase font-bold tracking-wider transition-colors"
+                          class="border border-blue-500/30 hover:border-blue-500 text-blue-600 dark:text-blue-400 hover:opacity-80 text-xs px-3.5 py-1.5 uppercase font-bold tracking-wider transition-colors"
                         >
                           Ver
                         </a>
@@ -530,7 +534,7 @@ const barGraphHeight = 160;
                       {item.status === 'REJECTED' && (
                         <button
                           onclick={`arquivarEvento('${item.id}')`}
-                          class="border border-zinc-800 hover:border-zinc-700 text-amber-500 hover:text-amber-400 text-[10px] px-3 py-1.5 uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                          class="border border-amber-500/30 hover:border-amber-500 text-amber-600 dark:text-amber-400 text-xs px-3.5 py-1.5 uppercase font-bold tracking-wider transition-colors cursor-pointer"
                         >
                           Arquivar
                         </button>
@@ -538,7 +542,7 @@ const barGraphHeight = 160;
                       {(item.status === 'DRAFT' || item.status === 'REJECTED' || (item.status === 'PUBLISHED' && item.confirmed === 0 && item.pending === 0)) && (
                         <button
                           onclick={`excluirEvento('${item.id}')`}
-                          class="bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-[10px] px-3 py-1.5 uppercase font-extrabold tracking-wider transition-colors cursor-pointer"
+                          class="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/20 text-xs px-3.5 py-1.5 uppercase font-extrabold tracking-wider transition-colors cursor-pointer"
                         >
                           Excluir
                         </button>

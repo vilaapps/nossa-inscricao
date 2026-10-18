@@ -1,0 +1,22 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SignUp } from '@clerk/astro/components';
+
+const { userId } = Astro.locals.auth();
+const redirectUrl = Astro.url.searchParams.get('redirect_url') || '/painel-organizador';
+
+if (userId) {
+  return Astro.redirect(redirectUrl);
+}
+---
+
+<BaseLayout title="Criar Conta — Nossa Inscrição" description="Crie sua conta gratuita na plataforma Nossa Inscrição.">
+  <div class="flex-grow flex items-center justify-center py-16 px-4">
+    <div class="w-full max-w-md">
+      <SignUp
+        forceRedirectUrl={redirectUrl}
+        signInUrl={`/sign-in${redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : ''}`}
+      />
+    </div>
+  </div>
+</BaseLayout>

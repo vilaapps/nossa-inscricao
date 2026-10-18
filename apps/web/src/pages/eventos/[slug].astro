@@ -70,13 +70,13 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
 <BaseLayout title={event.title} description={event.description || ''}>
   <!-- Top Header HUD -->
-  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
-    <div class="max-w-7xl mx-auto flex flex-col items-start font-mono text-[10px] tracking-widest text-zinc-500 gap-2">
-      <a href="/" class="hover:text-emerald-400 transition-colors uppercase flex items-center gap-1.5 mb-4">
+  <section class="bg-surface border-b border-ink-muted/20 py-8 px-6">
+    <div class="max-w-7xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
+      <a href="/" class="hover:text-accent transition-colors uppercase flex items-center gap-1.5 mb-2">
         &larr; Voltar para a listagem
       </a>
       <div class="flex items-center gap-4">
-        <span class="text-emerald-400 font-bold">DETALHES DO EVENTO</span>
+        <span class="text-accent font-bold">DETALHES DO EVENTO</span>
       </div>
     </div>
   </section>
@@ -91,7 +91,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             <img 
               src={event.bannerUrl} 
               alt={`Banner de ${event.title}`} 
-              class="w-full h-auto object-cover max-h-[400px] border border-zinc-800 mb-6" 
+              class="w-full h-auto object-cover max-h-[400px] border border-ink-muted/20 mb-6" 
             />
           )}
 
@@ -100,37 +100,37 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               <img 
                 src={event.logoUrl} 
                 alt={`Logo de ${event.title}`} 
-                class="w-16 h-16 object-cover border border-zinc-800 rounded-full" 
+                class="w-16 h-16 object-cover border border-ink-muted/20 rounded-full" 
               />
             )}
-            <h1 class="font-heading text-3xl md:text-5xl font-black text-white uppercase tracking-tight leading-none">
+            <h1 class="font-heading text-3xl md:text-5xl font-black text-ink uppercase tracking-tight leading-none">
               {event.title}
             </h1>
           </div>
 
-          <div class="flex flex-wrap gap-4 text-xs font-mono text-zinc-400">
-            <div class="bg-[#15171f] border border-zinc-800 px-3 py-1.5 uppercase">
+          <div class="flex flex-wrap gap-4 text-xs font-mono text-ink-muted">
+            <div class="bg-surface-alt border border-ink-muted/20 px-3 py-1.5 uppercase text-ink">
               📅 {formatDate(event.date)}
             </div>
-            <div class="bg-[#15171f] border border-zinc-800 px-3 py-1.5 uppercase">
+            <div class="bg-surface-alt border border-ink-muted/20 px-3 py-1.5 uppercase text-ink">
               👥 Vagas Restantes: {event.availableSlots}
             </div>
           </div>
         </div>
 
-        <div class="border-t border-zinc-800 pt-8 space-y-6">
-          <h2 class="font-heading text-lg font-bold text-white uppercase tracking-wider">Sobre a Competição</h2>
-          <p class="text-zinc-400 text-sm leading-relaxed whitespace-pre-line font-sans">
+        <div class="border-t border-ink-muted/20 pt-8 space-y-6">
+          <h2 class="font-heading text-lg font-bold text-ink uppercase tracking-wider">Sobre a Competição</h2>
+          <p class="text-ink-muted text-sm leading-relaxed whitespace-pre-line font-sans">
             {event.description || 'Nenhuma descrição detalhada disponível para este evento.'}
           </p>
 
           {event.trailerUrl && (
-            <div class="mt-8 border-t border-zinc-800 pt-6">
-              <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div class="mt-8 border-t border-ink-muted/20 pt-6">
+              <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider mb-4 flex items-center gap-2">
                 <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                 Trailer Promocional
               </h3>
-              <div class="aspect-w-16 aspect-h-9 relative w-full h-0 pb-[56.25%] border border-zinc-800">
+              <div class="aspect-w-16 aspect-h-9 relative w-full h-0 pb-[56.25%] border border-ink-muted/20">
                 <iframe 
                   src={event.trailerUrl} 
                   title="YouTube video player" 
@@ -145,23 +145,23 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         </div>
 
         <!-- Regulamento Dinâmico -->
-        <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-6">
-          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-zinc-900 pb-3">
+        <div class="bg-surface-alt border border-ink-muted/20 p-6 space-y-6 shadow-sm">
+          <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2 border-b border-ink-muted/20 pb-3">
             <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
             Regulamento & Contrato Oficial
           </h3>
 
           {event.contractPdf ? (
             <div class="space-y-4">
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0d0e12] border border-zinc-800/80 p-4 font-mono text-xs text-zinc-400">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-ink-muted/20 p-4 font-mono text-xs text-ink-muted">
                 <div>
-                  <div class="font-bold text-zinc-300 uppercase">Regulamento em Formato PDF</div>
-                  <div class="text-[10px] text-zinc-500 mt-0.5">O organizador disponibilizou os termos em arquivo oficial.</div>
+                  <div class="font-bold text-ink uppercase">Regulamento em Formato PDF</div>
+                  <div class="text-xs text-ink-muted mt-0.5">O organizador disponibilizou os termos em arquivo oficial.</div>
                 </div>
                 <a
                   href={event.contractPdf}
                   download={`${event.slug}-regulamento.pdf`}
-                  class="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-center font-bold uppercase tracking-wider text-[10px] px-4 py-2.5 border border-blue-500/30 transition-all font-mono"
+                  class="bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-center font-bold uppercase tracking-wider text-xs px-4 py-2.5 border border-blue-500/30 transition-all font-mono"
                   target="_blank"
                 >
                   Visualizar / Baixar PDF
@@ -169,12 +169,12 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               </div>
               <iframe
                 src={event.contractPdf}
-                class="w-full h-[500px] border border-zinc-900 bg-[#0d0e12]"
+                class="w-full h-[500px] border border-ink-muted/20 bg-surface"
                 title="Regulamento Oficial do Evento"
               />
             </div>
           ) : (
-            <div class="text-xs text-zinc-300 font-sans space-y-4 max-h-[400px] overflow-y-auto pr-2 markdown-body">
+            <div class="text-xs text-ink-muted font-sans space-y-4 max-h-[400px] overflow-y-auto pr-2 markdown-body">
               <Fragment set:html={marked.parse(event.contractText || defaultContractText)} />
             </div>
           )}
@@ -182,21 +182,21 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
         <!-- Localização Google Maps (Caso 2) -->
         {(event.location || event.locationUrl) && (
-          <div class="bg-[#15171f] border border-zinc-800 p-6 space-y-6">
-            <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-zinc-900 pb-3">
+          <div class="bg-surface-alt border border-ink-muted/20 p-6 space-y-6 shadow-sm">
+            <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2 border-b border-ink-muted/20 pb-3">
               <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
               Localização do Evento
             </h3>
 
             {event.locationUrl ? (
               <div class="space-y-4">
-                <div class="text-xs text-zinc-400 font-mono uppercase tracking-wider bg-[#0d0e12] border border-zinc-800/80 p-3 flex items-center gap-2">
+                <div class="text-xs text-ink font-mono uppercase tracking-wider bg-surface border border-ink-muted/20 p-3 flex items-center gap-2">
                   <span>📍</span>
                   {event.location || "Local da Prova"}
                 </div>
                 <iframe 
                   src={event.locationUrl} 
-                  class="w-full h-[350px] border border-zinc-900 grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500" 
+                  class="w-full h-[350px] border border-ink-muted/20 grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500" 
                   allowfullscreen="" 
                   loading="lazy" 
                   referrerpolicy="no-referrer-when-downgrade"
@@ -204,7 +204,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 ></iframe>
               </div>
             ) : (
-              <div class="text-xs text-zinc-400 font-mono uppercase tracking-wider bg-[#0d0e12] border border-zinc-800/80 p-4 flex items-center gap-2">
+              <div class="text-xs text-ink font-mono uppercase tracking-wider bg-surface border border-ink-muted/20 p-4 flex items-center gap-2">
                 <span>📍</span>
                 {event.location}
               </div>
@@ -214,29 +214,29 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       </div>
 
       <!-- Coluna Direita: Painel HUD de Inscrição (1/3) -->
-      <div class="bg-[#15171f] border border-zinc-800 p-6 relative">
-        <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-800 pointer-events-none"></div>
+      <div class="bg-surface-alt border border-ink-muted/20 p-6 relative shadow-sm">
+        <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-ink-muted/20 pointer-events-none"></div>
         
-        <h2 class="font-heading text-lg font-bold text-white uppercase tracking-wider mb-6 pb-4 border-b border-zinc-800 flex items-center justify-between">
+        <h2 class="font-heading text-lg font-bold text-ink uppercase tracking-wider mb-6 pb-4 border-b border-ink-muted/20 flex items-center justify-between">
           <span>Inscrição</span>
-          <span class="text-emerald-400 text-xs font-mono font-normal tracking-normal uppercase">Lote Ativo</span>
+          <span class="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-normal tracking-normal uppercase">Lote Ativo</span>
         </h2>
 
         {activeBatch ? (
           <div class="space-y-6">
             <!-- Informações do Lote -->
-            <div class="bg-[#0d0e12] border border-zinc-800/80 p-4 font-mono">
-              <div class="text-[10px] text-zinc-500 uppercase">Nome do Lote</div>
-              <div class="text-zinc-200 text-sm font-bold mt-0.5">{activeBatch.name}</div>
+            <div class="bg-surface border border-ink-muted/20 p-4 font-mono">
+              <div class="text-xs font-semibold text-ink-muted uppercase">Nome do Lote</div>
+              <div class="text-ink text-sm font-bold mt-0.5">{activeBatch.name}</div>
               
-              <div class="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-zinc-800/60 text-[10px]">
+              <div class="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-ink-muted/20 text-xs">
                 <div>
-                  <span class="text-zinc-500 block uppercase">Valor Base</span>
-                  <span class="text-emerald-400 font-bold text-sm block mt-0.5">{formatCurrency(Number(activeBatch.price))}</span>
+                  <span class="text-ink-muted block uppercase">Valor Base</span>
+                  <span class="text-emerald-600 dark:text-emerald-400 font-bold text-sm block mt-0.5">{formatCurrency(Number(activeBatch.price))}</span>
                 </div>
                 <div>
-                  <span class="text-zinc-500 block uppercase">Taxa Adm</span>
-                  <span class="text-zinc-400 block mt-0.5">Grátis</span>
+                  <span class="text-ink-muted block uppercase">Taxa Adm</span>
+                  <span class="text-ink block mt-0.5">Grátis</span>
                 </div>
               </div>
             </div>
@@ -252,18 +252,20 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 </a>
               ) : (
                 <>
-                  <div class="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 font-mono text-xs uppercase py-4 tracking-widest font-bold transition-all duration-200 text-center cursor-pointer">
-                    <SignInButton mode="modal" forceRedirectUrl={`/inscricao/${event.id}`} />
-                  </div>
-                  <span class="block text-center text-[9px] text-zinc-600 font-mono uppercase mt-2">
-                    FAÇA LOGIN PARA GARANTIR SUA VAGA DE FORMA IMEDIATA
+                  <SignInButton mode="modal" forceRedirectUrl={`/inscricao/${event.id}`} asChild>
+                    <button class="w-full bg-accent hover:opacity-90 text-white font-mono text-xs uppercase py-4 tracking-widest font-extrabold transition-all duration-200 text-center cursor-pointer shadow-sm">
+                      Login para Fazer Inscrição
+                    </button>
+                  </SignInButton>
+                  <span class="block text-center text-xs text-ink-muted font-mono uppercase mt-2">
+                    Faça login para garantir sua vaga de forma imediata
                   </span>
                 </>
               )}
             </div>
           </div>
         ) : (
-          <div class="border border-dashed border-zinc-800 p-6 text-center text-zinc-500 font-mono text-xs">
+          <div class="border border-dashed border-ink-muted/30 p-6 text-center text-ink-muted font-mono text-xs">
             NENHUM LOTE ATIVO ENCONTRADO PARA ESTE EVENTO. AS INSCRIÇÕES ESTÃO INDISPONÍVEIS.
           </div>
         )}
