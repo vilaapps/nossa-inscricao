@@ -49,13 +49,13 @@ const getStatusClasses = (status: string, paymentStatus: string, context: 'ACTIV
   if (context === 'PAST') {
     if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
       return {
-        bg: 'bg-blue-500/5 border-blue-500/20 text-blue-400',
+        bg: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
         label: 'Participou',
         indicator: 'bg-blue-500',
       };
     }
     return {
-      bg: 'bg-zinc-500/5 border-zinc-500/20 text-zinc-500',
+      bg: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-600 dark:text-zinc-400',
       label: 'Não Participou',
       indicator: 'bg-zinc-500',
     };
@@ -65,13 +65,13 @@ const getStatusClasses = (status: string, paymentStatus: string, context: 'ACTIV
   if (context === 'CANCELLED') {
     if (status === 'CANCELLED') {
       return {
-        bg: 'bg-red-500/5 border-red-500/20 text-red-400',
+        bg: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400',
         label: 'Cancelada',
         indicator: 'bg-red-500',
       };
     }
     return {
-      bg: 'bg-zinc-500/5 border-zinc-500/20 text-zinc-400',
+      bg: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-600 dark:text-zinc-400',
       label: 'Pagamento Expirado',
       indicator: 'bg-zinc-500',
     };
@@ -80,13 +80,13 @@ const getStatusClasses = (status: string, paymentStatus: string, context: 'ACTIV
   // 3. Contexto Vigente
   if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
     return {
-      bg: 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400',
+      bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
       label: 'Confirmada & Paga',
       indicator: 'bg-emerald-500',
     };
   }
   return {
-    bg: 'bg-amber-500/5 border-amber-500/20 text-amber-400',
+    bg: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400',
     label: 'Aguardando Pagamento',
     indicator: 'bg-amber-500',
   };
@@ -114,11 +114,11 @@ const pastRegistrations = registrations.filter(r =>
 ---
 
 <BaseLayout title="Minhas Inscrições — Painel do Participante">
-  <section class="bg-[#08090c] border-b border-zinc-900 py-12 px-6">
+  <section class="bg-surface border-b border-ink-muted/20 py-12 px-6">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4 font-mono">
       <div>
-        <div class="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Painel do Atleta</div>
-        <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider">
+        <div class="text-xs uppercase tracking-widest text-ink-muted mb-2 font-medium">Painel do Atleta</div>
+        <h1 class="font-heading text-3xl font-extrabold uppercase text-ink tracking-wider">
           Minhas Inscrições
         </h1>
       </div>
@@ -128,16 +128,16 @@ const pastRegistrations = registrations.filter(r =>
   <section class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full space-y-16">
     {/* VIGENTES */}
     <div>
-      <h2 class="font-heading text-xl font-bold uppercase text-white tracking-wider mb-6 border-b border-zinc-800 pb-4">
+      <h2 class="font-heading text-xl md:text-2xl font-bold uppercase text-ink tracking-wider mb-6 border-b border-ink-muted/20 pb-4">
         Inscrições Vigentes
       </h2>
       
       {activeRegistrations.length === 0 ? (
-        <div class="border border-dashed border-zinc-800 p-12 text-center font-mono text-zinc-500 space-y-6">
-          <div>VOCÊ NÃO POSSUI NENHUMA INSCRIÇÃO ATIVA NO MOMENTO.</div>
+        <div class="border border-dashed border-ink-muted/30 p-12 text-center font-mono text-ink-muted space-y-6">
+          <div class="text-sm md:text-base">VOCÊ NÃO POSSUI NENHUMA INSCRIÇÃO ATIVA NO MOMENTO.</div>
           <a
             href="/"
-            class="inline-block bg-zinc-900 border border-zinc-800 hover:border-emerald-500 text-white text-xs uppercase px-8 py-3 tracking-widest font-semibold transition-all duration-200"
+            class="inline-block bg-surface-alt border border-ink-muted/30 hover:border-accent text-ink text-xs md:text-sm uppercase px-8 py-3.5 tracking-widest font-semibold transition-all duration-200"
           >
             Navegar por Eventos
           </a>
@@ -150,72 +150,76 @@ const pastRegistrations = registrations.filter(r =>
             const pixCode = reg.payment?.pixQrCode;
 
             return (
-              <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between relative group">
-                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-800 pointer-events-none group-hover:border-zinc-700 transition-colors"></div>
+              <div class="bg-surface-alt border border-ink-muted/20 p-6 md:p-8 flex flex-col justify-between relative group shadow-sm">
+                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-ink-muted/20 pointer-events-none group-hover:border-accent/40 transition-colors"></div>
 
                 <div>
-                  <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
-                    <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
-                    <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
-                      <span class={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator} ${isPending ? 'animate-pulse' : ''}`}></span>
+                  <div class="flex items-center justify-between mb-4 font-mono text-xs md:text-sm">
+                    <span class="text-ink-muted uppercase font-semibold">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
+                    <span class={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border ${statusConfig.bg}`}>
+                      <span class={`w-2 h-2 rounded-full ${statusConfig.indicator} ${isPending ? 'animate-pulse' : ''}`}></span>
                       {statusConfig.label}
                     </span>
                   </div>
 
-                  <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider mb-2">
+                  <h3 class="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider mb-3">
                     {reg.event.title}
                   </h3>
 
-                  <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-400">
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6 my-6 font-mono text-sm">
                     <div>
-                      <span class="text-zinc-500 block uppercase">Categoria</span>
-                      <span class="text-zinc-300 block mt-0.5">{reg.category.name}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Data do Evento</span>
+                      <span class="text-ink font-bold block mt-1 text-sm md:text-base">{formatDate(reg.event.date)}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-500 block uppercase">Lote Adquirido</span>
-                      <span class="text-zinc-300 block mt-0.5">{reg.batch.name}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Data Inscrição</span>
+                      <span class="text-ink font-medium block mt-1 text-sm md:text-base">{formatDate(reg.createdAt)}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-500 block uppercase">Valor Pago</span>
-                      <span class="text-zinc-200 font-bold block mt-0.5">{formatCurrency(Number(reg.amountPaid))}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Valor Pago</span>
+                      <span class="text-ink font-bold block mt-1 text-base md:text-lg">{formatCurrency(Number(reg.amountPaid))}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-500 block uppercase">Data Inscrição</span>
-                      <span class="text-zinc-300 block mt-0.5">{formatDate(reg.createdAt)}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Categoria</span>
+                      <span class="text-ink font-medium block mt-1 text-sm md:text-base">{reg.category.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Lote Adquirido</span>
+                      <span class="text-ink font-medium block mt-1 text-sm md:text-base">{reg.batch.name}</span>
                     </div>
                   </div>
                 </div>
 
                 {isPending && pixCode && (
-                  <div class="border-t border-zinc-800/60 pt-6 mt-4 space-y-4 font-mono text-xs">
-                    <div class="bg-[#0d0e12] border border-zinc-800 p-4 space-y-3">
-                      <div class="flex items-center justify-between text-[10px]">
-                        <span class="text-amber-400 flex items-center gap-1.5">
-                          <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping"></span>
+                  <div class="border-t border-ink-muted/20 pt-6 mt-4 space-y-4 font-mono text-xs md:text-sm">
+                    <div class="bg-surface border border-ink-muted/20 p-5 space-y-4">
+                      <div class="flex items-center justify-between text-xs font-semibold">
+                        <span class="text-amber-500 dark:text-amber-400 flex items-center gap-1.5 font-bold">
+                          <span class="w-2 h-2 bg-amber-500 dark:bg-amber-400 rounded-full animate-ping"></span>
                           PAGAMENTO PIX DISPONÍVEL
                         </span>
-                        <span class="text-zinc-500">Gateway: Asaas</span>
+                        <span class="text-ink-muted">Gateway: Asaas</span>
                       </div>
                       
-                      <div class="w-36 h-36 mx-auto bg-white p-2 border border-zinc-800">
+                      <div class="w-40 h-40 mx-auto bg-white p-2.5 border border-ink-muted/20 shadow-sm">
                         <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(pixCode)}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(pixCode)}`}
                           alt="QR Code PIX para pagamento"
                           class="w-full h-full object-contain"
                         />
                       </div>
 
-                      <div class="space-y-1">
-                        <span class="text-[9px] text-zinc-500 uppercase">PIX Copia e Cola</span>
-                        <div class="flex gap-1">
+                      <div class="space-y-1.5">
+                        <span class="text-xs text-ink-muted uppercase font-semibold">PIX Copia e Cola</span>
+                        <div class="flex gap-2">
                           <input
                             type="text"
                             readonly
                             value={pixCode}
-                            class="bg-zinc-950 border border-zinc-800 text-zinc-400 px-2.5 py-2 text-[10px] flex-grow outline-none truncate"
+                            class="bg-surface-alt border border-ink-muted/20 text-ink px-3 py-2.5 text-xs md:text-sm flex-grow outline-none truncate font-mono"
                           />
                           <button
-                            class="pix-copy-btn bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 px-3 text-[10px]"
+                            class="pix-copy-btn bg-surface border border-ink-muted/30 hover:border-accent text-ink px-4 py-2.5 text-xs md:text-sm font-bold uppercase transition-colors cursor-pointer"
                             data-pix={pixCode}
                           >
                             Copiar
@@ -235,46 +239,50 @@ const pastRegistrations = registrations.filter(r =>
     {/* CANCELADAS / EXPIRADAS (Eventos Futuros) */}
     {cancelledRegistrations.length > 0 && (
       <div>
-        <h2 class="font-heading text-xl font-bold uppercase text-white tracking-wider mb-6 border-b border-zinc-800 pb-4">
+        <h2 class="font-heading text-xl md:text-2xl font-bold uppercase text-ink tracking-wider mb-6 border-b border-ink-muted/20 pb-4">
           Inscrições Canceladas
         </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-75 hover:opacity-100 transition-opacity duration-300">
           {cancelledRegistrations.map((reg) => {
             const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'CANCELLED');
 
             return (
-              <div class="bg-[#15171f] border border-red-500/10 p-6 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300">
+              <div class="bg-surface-alt border border-red-500/20 p-6 md:p-8 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300 shadow-sm">
                 <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-red-500/20 pointer-events-none group-hover:border-red-500/40 transition-colors"></div>
 
                 <div>
-                  <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
-                    <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
-                    <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
-                      <span class={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator}`}></span>
+                  <div class="flex items-center justify-between mb-4 font-mono text-xs md:text-sm">
+                    <span class="text-ink-muted uppercase font-semibold">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
+                    <span class={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border ${statusConfig.bg}`}>
+                      <span class={`w-2 h-2 rounded-full ${statusConfig.indicator}`}></span>
                       {statusConfig.label}
                     </span>
                   </div>
 
-                  <h3 class="font-heading text-lg font-bold text-zinc-400 uppercase tracking-wider mb-2 line-through decoration-red-500/30">
+                  <h3 class="font-heading text-xl md:text-2xl font-bold text-ink-muted uppercase tracking-wider mb-3 line-through decoration-red-500/40">
                     {reg.event.title}
                   </h3>
 
-                  <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-500">
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6 my-6 font-mono text-sm">
                     <div>
-                      <span class="text-zinc-600 block uppercase">Categoria</span>
-                      <span class="block mt-0.5">{reg.category.name}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Data do Evento</span>
+                      <span class="text-ink block mt-1 text-sm md:text-base">{formatDate(reg.event.date)}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-600 block uppercase">Lote Adquirido</span>
-                      <span class="block mt-0.5">{reg.batch.name}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Data Inscrição</span>
+                      <span class="text-ink block mt-1 text-sm md:text-base">{formatDate(reg.createdAt)}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-600 block uppercase">Valor</span>
-                      <span class="block mt-0.5">{formatCurrency(Number(reg.amountPaid))}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Valor</span>
+                      <span class="text-ink font-bold block mt-1 text-base md:text-lg">{formatCurrency(Number(reg.amountPaid))}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-600 block uppercase">Data Inscrição</span>
-                      <span class="block mt-0.5">{formatDate(reg.createdAt)}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Categoria</span>
+                      <span class="text-ink block mt-1 text-sm md:text-base">{reg.category.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Lote Adquirido</span>
+                      <span class="text-ink block mt-1 text-sm md:text-base">{reg.batch.name}</span>
                     </div>
                   </div>
                 </div>
@@ -288,46 +296,50 @@ const pastRegistrations = registrations.filter(r =>
     {/* ENCERRADAS (Histórico de Eventos) */}
     {pastRegistrations.length > 0 && (
       <div>
-        <h2 class="font-heading text-xl font-bold uppercase text-white tracking-wider mb-6 border-b border-zinc-800 pb-4">
+        <h2 class="font-heading text-xl md:text-2xl font-bold uppercase text-ink tracking-wider mb-6 border-b border-ink-muted/20 pb-4">
           Histórico de Eventos
         </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-75 hover:opacity-100 transition-opacity duration-300">
           {pastRegistrations.map((reg) => {
             const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'PAST');
 
             return (
-              <div class="bg-[#15171f] border border-zinc-800 p-6 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300">
-                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-zinc-800 pointer-events-none group-hover:border-zinc-700 transition-colors"></div>
+              <div class="bg-surface-alt border border-ink-muted/20 p-6 md:p-8 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300 shadow-sm">
+                <div class="absolute top-0 right-0 w-8 h-8 border-t border-r border-ink-muted/20 pointer-events-none group-hover:border-accent/40 transition-colors"></div>
 
                 <div>
-                  <div class="flex items-center justify-between mb-4 font-mono text-[10px]">
-                    <span class="text-zinc-500 uppercase">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
-                    <span class={`flex items-center gap-1.5 px-2.5 py-1 border ${statusConfig.bg}`}>
-                      <span class={`w-1.5 h-1.5 rounded-full ${statusConfig.indicator}`}></span>
+                  <div class="flex items-center justify-between mb-4 font-mono text-xs md:text-sm">
+                    <span class="text-ink-muted uppercase font-semibold">Inscrição #{reg.id.substring(0, 8).toUpperCase()}</span>
+                    <span class={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border ${statusConfig.bg}`}>
+                      <span class={`w-2 h-2 rounded-full ${statusConfig.indicator}`}></span>
                       {statusConfig.label}
                     </span>
                   </div>
 
-                  <h3 class="font-heading text-lg font-bold text-white uppercase tracking-wider mb-2">
+                  <h3 class="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider mb-3">
                     {reg.event.title}
                   </h3>
 
-                  <div class="grid grid-cols-2 gap-4 my-6 font-mono text-[11px] text-zinc-400">
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6 my-6 font-mono text-sm">
                     <div>
-                      <span class="text-zinc-500 block uppercase">Categoria</span>
-                      <span class="text-zinc-300 block mt-0.5">{reg.category.name}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Data do Evento</span>
+                      <span class="text-ink font-bold block mt-1 text-sm md:text-base">{formatDate(reg.event.date)}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-500 block uppercase">Lote Adquirido</span>
-                      <span class="text-zinc-300 block mt-0.5">{reg.batch.name}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Data Inscrição</span>
+                      <span class="text-ink font-medium block mt-1 text-sm md:text-base">{formatDate(reg.createdAt)}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-500 block uppercase">Valor Pago</span>
-                      <span class="text-zinc-200 font-bold block mt-0.5">{formatCurrency(Number(reg.amountPaid))}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Valor Pago</span>
+                      <span class="text-ink font-bold block mt-1 text-base md:text-lg">{formatCurrency(Number(reg.amountPaid))}</span>
                     </div>
                     <div>
-                      <span class="text-zinc-500 block uppercase">Data Inscrição</span>
-                      <span class="text-zinc-300 block mt-0.5">{formatDate(reg.createdAt)}</span>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Categoria</span>
+                      <span class="text-ink font-medium block mt-1 text-sm md:text-base">{reg.category.name}</span>
+                    </div>
+                    <div>
+                      <span class="text-ink-muted block uppercase text-xs font-semibold tracking-wider">Lote Adquirido</span>
+                      <span class="text-ink font-medium block mt-1 text-sm md:text-base">{reg.batch.name}</span>
                     </div>
                   </div>
                 </div>
@@ -342,7 +354,7 @@ const pastRegistrations = registrations.filter(r =>
   <!-- Toast Notificação Cópia -->
   <div
     id="copy-toast"
-    class="fixed bottom-6 right-6 z-50 bg-[#15171f] border border-emerald-500/50 p-4 font-mono text-xs text-emerald-400 hidden shadow-2xl flex items-center gap-3"
+    class="fixed bottom-6 right-6 z-50 bg-surface-alt border border-emerald-500/50 p-4 font-mono text-xs text-emerald-600 dark:text-emerald-400 hidden shadow-2xl flex items-center gap-3"
   >
     <span class="w-2 h-2 bg-emerald-500 rounded-full inline-block"></span>
     Código PIX copiado com sucesso!

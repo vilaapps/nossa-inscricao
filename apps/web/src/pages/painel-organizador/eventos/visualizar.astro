@@ -59,130 +59,130 @@ if (event.tenantId !== user.tenantId) {
 
 <BaseLayout title={`Visualizar: ${event.title}`}>
   <!-- Cabeçalho HUD -->
-  <section class="bg-[#08090c] border-b border-zinc-900 py-8 px-6">
-    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-[10px] tracking-widest text-zinc-500 gap-2">
-      <a href="/painel-organizador" class="hover:text-emerald-400 transition-colors uppercase flex items-center gap-1.5 mb-2">
+  <section class="bg-surface border-b border-ink-muted/20 py-8 px-6">
+    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
+      <a href="/painel-organizador" class="hover:text-accent transition-colors uppercase flex items-center gap-1.5 mb-2">
         &larr; Voltar para Dashboard
       </a>
       <div class="flex items-center gap-4">
-        <span class="text-blue-400 font-bold">MEUS EVENTOS</span>
-        <span class="text-zinc-700">|</span>
-        <span class="text-zinc-400 font-semibold">VISUALIZAÇÃO (READ-ONLY)</span>
+        <span class="text-accent font-bold">MEUS EVENTOS</span>
+        <span class="text-ink-muted">|</span>
+        <span class="text-ink-muted font-semibold">VISUALIZAÇÃO (READ-ONLY)</span>
       </div>
-      <h1 class="font-heading text-3xl font-extrabold uppercase text-white tracking-wider mt-2">
+      <h1 class="font-heading text-3xl font-extrabold uppercase text-ink tracking-wider mt-2">
         {event.title}
       </h1>
-      <div class="text-[10px] uppercase text-amber-500 mt-1 font-bold border border-amber-500/20 bg-amber-500/10 px-2 py-0.5">
+      <div class="text-xs uppercase text-amber-500 mt-1 font-bold border border-amber-500/20 bg-amber-500/10 px-2.5 py-1">
         Modo Leitura — Evento Aprovado/Publicado
       </div>
     </div>
   </section>
 
   <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full font-mono text-xs">
-    <div class="bg-[#15171f] border border-zinc-800 p-8 space-y-8 relative">
-      <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+    <div class="bg-surface-alt border border-ink-muted/20 p-8 space-y-8 relative shadow-sm">
+      <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-ink-muted/20 pointer-events-none"></div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div class="space-y-4">
           <div>
-            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Modalidade</div>
-            <div class="text-zinc-200 uppercase font-bold bg-[#0d0e12] border border-zinc-800 px-4 py-3">
+            <div class="text-xs text-ink-muted uppercase tracking-wider mb-1 font-semibold">Modalidade</div>
+            <div class="text-ink uppercase font-bold bg-surface border border-ink-muted/20 px-4 py-3">
               {event.eventType}
             </div>
           </div>
           <div>
-            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Data & Horário</div>
-            <div class="text-zinc-200 bg-[#0d0e12] border border-zinc-800 px-4 py-3">
+            <div class="text-xs text-ink-muted uppercase tracking-wider mb-1 font-semibold">Data & Horário</div>
+            <div class="text-ink bg-surface border border-ink-muted/20 px-4 py-3">
               {new Date(event.date).toLocaleString('pt-BR')}
             </div>
           </div>
           <div>
-            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Limite Geral de Vagas</div>
-            <div class="text-zinc-200 bg-[#0d0e12] border border-zinc-800 px-4 py-3">
+            <div class="text-xs text-ink-muted uppercase tracking-wider mb-1 font-semibold">Limite Geral de Vagas</div>
+            <div class="text-ink bg-surface border border-ink-muted/20 px-4 py-3">
               {event.availableSlots} vagas
             </div>
           </div>
           <div>
-            <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Localização</div>
-            <div class="text-zinc-200 bg-[#0d0e12] border border-zinc-800 px-4 py-3 truncate" title={event.location || 'Não informado'}>
+            <div class="text-xs text-ink-muted uppercase tracking-wider mb-1 font-semibold">Localização</div>
+            <div class="text-ink bg-surface border border-ink-muted/20 px-4 py-3 truncate" title={event.location || 'Não informado'}>
               {event.location || 'NÃO INFORMADO'}
             </div>
           </div>
         </div>
 
         <div class="space-y-4">
-          <div class="text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Preview de Mídia</div>
-          <div class="bg-[#0d0e12] border border-zinc-800 p-4 h-full flex flex-col items-center justify-center gap-4">
+          <div class="text-xs text-ink-muted uppercase tracking-wider mb-1 font-semibold">Preview de Mídia</div>
+          <div class="bg-surface border border-ink-muted/20 p-4 h-full flex flex-col items-center justify-center gap-4">
             {event.logoUrl && (
-              <img src={event.logoUrl} alt="Logo" class="w-16 h-16 object-cover rounded-full border border-zinc-700" />
+              <img src={event.logoUrl} alt="Logo" class="w-16 h-16 object-cover rounded-full border border-ink-muted/30" />
             )}
             {event.bannerUrl ? (
-              <img src={event.bannerUrl} alt="Banner" class="w-full h-32 object-cover border border-zinc-700" />
+              <img src={event.bannerUrl} alt="Banner" class="w-full h-32 object-cover border border-ink-muted/30" />
             ) : (
-              <div class="w-full h-32 bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600">Sem Banner</div>
+              <div class="w-full h-32 bg-surface-alt border border-ink-muted/20 flex items-center justify-center text-ink-muted">Sem Banner</div>
             )}
           </div>
         </div>
       </div>
 
-      <div class="border-t border-zinc-800 pt-6 mb-6">
-        <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4">
+      <div class="border-t border-ink-muted/20 pt-6 mb-6">
+        <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider mb-4">
           Informações Básicas / Descrição
         </h3>
-        <div class="bg-[#0d0e12] border border-zinc-800 p-4 text-zinc-400 font-sans text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
+        <div class="bg-surface border border-ink-muted/20 p-4 text-ink font-sans text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
           {event.description || 'SEM DESCRIÇÃO INFORMADA'}
         </div>
       </div>
 
-      <div class="border-t border-zinc-800 pt-6">
+      <div class="border-t border-ink-muted/20 pt-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider">
+          <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider">
             Regulamento
           </h3>
-          <button id="toggle-markdown" class="text-[10px] uppercase text-zinc-400 hover:text-white border border-zinc-800 px-2 py-1 transition-colors cursor-pointer">
+          <button id="toggle-markdown" class="text-xs uppercase text-ink-muted hover:text-ink border border-ink-muted/30 hover:border-ink-muted px-3 py-1.5 transition-colors cursor-pointer font-bold">
             Ver em Texto Original
           </button>
         </div>
         
-        <div id="contract-html" class="bg-[#0d0e12] border border-zinc-800 p-4 text-zinc-300 font-sans text-xs max-h-64 overflow-y-auto markdown-body space-y-4">
+        <div id="contract-html" class="bg-surface border border-ink-muted/20 p-4 text-ink font-sans text-xs max-h-64 overflow-y-auto markdown-body space-y-4">
           <Fragment set:html={event.contractText ? marked.parse(event.contractText) : 'SEM TEXTO DE REGULAMENTO'} />
         </div>
 
-        <div id="contract-text" class="hidden bg-[#0d0e12] border border-zinc-800 p-4 text-zinc-400 font-sans text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+        <div id="contract-text" class="hidden bg-surface border border-ink-muted/20 p-4 text-ink font-sans text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
           {event.contractText || 'SEM TEXTO DE REGULAMENTO'}
         </div>
         {event.contractPdf && (
           <div class="mt-4">
-            <a href={event.contractPdf} target="_blank" class="text-blue-400 hover:underline uppercase text-[10px] font-bold">
+            <a href={event.contractPdf} target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline uppercase text-xs font-bold inline-flex items-center gap-1.5">
               Visualizar PDF do Regulamento
             </a>
           </div>
         )}
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-zinc-800 pt-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-ink-muted/20 pt-6">
         <div>
-          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4">
+          <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider mb-4">
             Categorias
           </h3>
           <ul class="space-y-2">
             {event.categories.map((cat: any) => (
-              <li class="bg-[#0d0e12] border border-zinc-800 px-4 py-3 flex items-center justify-between">
-                <span class="text-zinc-200 uppercase font-bold text-[10px]">{cat.name}</span>
-                <span class="text-zinc-500 text-[10px]">{genderMap[cat.gender] || cat.gender} — {cat.availableSlots} vagas</span>
+              <li class="bg-surface border border-ink-muted/20 px-4 py-3 flex items-center justify-between">
+                <span class="text-ink uppercase font-bold text-xs">{cat.name}</span>
+                <span class="text-ink-muted text-xs">{genderMap[cat.gender] || cat.gender} — {cat.availableSlots} vagas</span>
               </li>
             ))}
           </ul>
         </div>
         <div>
-          <h3 class="font-heading text-sm font-bold text-white uppercase tracking-wider mb-4">
+          <h3 class="font-heading text-sm font-bold text-ink uppercase tracking-wider mb-4">
             Lotes
           </h3>
           <ul class="space-y-2">
             {event.batches.map((bat: any) => (
-              <li class="bg-[#0d0e12] border border-zinc-800 px-4 py-3 flex items-center justify-between">
-                <span class="text-zinc-200 uppercase font-bold text-[10px]">{bat.name}</span>
-                <span class="text-emerald-400 font-bold text-[10px]">
+              <li class="bg-surface border border-ink-muted/20 px-4 py-3 flex items-center justify-between">
+                <span class="text-ink uppercase font-bold text-xs">{bat.name}</span>
+                <span class="text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bat.price))}
                 </span>
               </li>

@@ -107,18 +107,36 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
         }
       }
 
+      // Aplicação de taxa administrativa (transferida para o usuário)
+      const tenant = tx.tenant ? await tx.tenant.findUnique({ where: { id: tenantId } }) : null;
+      const commissionRate = tenant?.commissionRate !== undefined && tenant?.commissionRate !== null
+        ? Number(tenant.commissionRate)
+        : 0;
+
+      const subtotal = finalPrice;
+      const adminFee = Number(((subtotal * commissionRate) / 100).toFixed(2));
+      const totalAmount = Number((subtotal + adminFee).toFixed(2));
+
+      const metadataObj = registration.metadata ? (registration.metadata as any) : {};
+      const updatedMetadata = {
+        ...metadataObj,
+        subtotal,
+        adminFee,
+        commissionRate,
+      };
+
       await tx.registration.update({
         where: { id: registrationId },
         data: {
           status: 'PENDING',
-          amountPaid: finalPrice,
+          amountPaid: totalAmount,
           couponId,
+          metadata: updatedMetadata,
         },
       });
 
       // 4. Enfileira o job de pagamento na fila payment-queue
       const paymentQueue = getQueue(QueueName.PAYMENT);
-      const metadataObj = registration.metadata ? (registration.metadata as any) : {};
       const method: 'PIX' | 'CREDIT_CARD' = metadataObj.paymentMethod === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX';
 
       const paymentJobData: PaymentJobData = {
@@ -126,7 +144,7 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
         orderId: registrationId,
         userId,
         tenantId,
-        amount: finalPrice,
+        amount: totalAmount,
         method,
         customerEmail: registration.user.email,
         customerName: registration.user.name || 'Participante',

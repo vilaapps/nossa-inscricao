@@ -3,12 +3,14 @@ import { marked } from "marked";
 import { uploadFileToSupabase } from "../../lib/upload-helper";
 
 interface CategoryField {
+  id?: string;
   name: string;
   gender: string;
   slots: number;
 }
 
 interface BatchField {
+  id?: string;
   name: string;
   price: string;
 }
@@ -29,18 +31,21 @@ interface EditEventFormProps {
     contractText: string | null;
     contractPdf: string | null;
     categories: Array<{
+      id?: string;
       name: string;
       gender: string;
       availableSlots: number;
     }>;
     batches: Array<{
+      id?: string;
       name: string;
       price: any; // Decimal type or string
     }>;
   };
+  isAdmin?: boolean;
 }
 
-export default function EditEventForm({ event }: EditEventFormProps) {
+export default function EditEventForm({ event, isAdmin = false }: EditEventFormProps) {
   // Helper to format Date/ISO string to YYYY-MM-DDTHH:MM
   const formatDatetimeLocal = (dateVal: string | Date) => {
     const d = new Date(dateVal);
@@ -73,6 +78,7 @@ export default function EditEventForm({ event }: EditEventFormProps) {
   // Categorias Dinâmicas
   const [categories, setCategories] = useState<CategoryField[]>(
     event.categories.map((cat) => ({
+      id: cat.id,
       name: cat.name,
       gender: cat.gender,
       slots: cat.availableSlots,
@@ -92,6 +98,7 @@ export default function EditEventForm({ event }: EditEventFormProps) {
   // Lotes Dinâmicos
   const [batches, setBatches] = useState<BatchField[]>(
     event.batches.map((bat) => ({
+      id: bat.id,
       name: bat.name,
       price: parseDecimal(bat.price),
     })),
@@ -226,8 +233,14 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         bannerUrl: finalBannerUrl,
         logoUrl: finalLogoUrl,
         trailerUrl,
-        categories,
+        categories: categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          gender: c.gender,
+          slots: Number(c.slots),
+        })),
         batches: batches.map((b) => ({
+          id: b.id,
           name: b.name,
           price: Number(b.price) || 0,
         })),
@@ -256,7 +269,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       setSuccessMessage("Evento editado com sucesso! Redirecionando...");
 
       setTimeout(() => {
-        window.location.href = "/painel-organizador";
+        window.location.href = isAdmin ? "/admin/dashboard" : "/painel-organizador";
       }, 1500);
     } catch (err: any) {
       setErrorMessage(err.message || "Ocorreu um erro ao salvar o evento.");
@@ -277,33 +290,32 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full bg-[#15171f] border border-zinc-800 p-6 md:p-8 relative"
+      className="w-full bg-surface-alt border border-ink-muted/20 p-6 md:p-8 relative shadow-sm"
     >
-      <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-zinc-700 pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-ink-muted/20 pointer-events-none"></div>
 
       <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-white uppercase tracking-wider">
+        <h2 className="font-heading text-2xl font-bold text-ink uppercase tracking-wider">
           Editar Evento (Rascunho)
         </h2>
-        <p className="text-zinc-500 text-xs mt-1 font-mono uppercase">
+        <p className="text-ink-muted text-xs md:text-sm mt-1 font-mono uppercase">
           Atualize as informações da prova esportiva.
         </p>
       </div>
 
       {isUploading && (
-        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs md:text-sm font-mono p-4 mb-6 uppercase flex items-center gap-2">
           <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent animate-spin rounded-full inline-block"></span>
           Fazendo upload de arquivo...
         </div>
       )}
 
-
       {/* DADOS PRINCIPAIS DO EVENTO */}
-      <div className="space-y-4 font-mono text-xs text-zinc-400 mb-8">
+      <div className="space-y-5 font-mono text-xs md:text-sm mb-8">
         <div className="space-y-2">
           <label
             htmlFor="title"
-            className="text-[10px] uppercase block tracking-wider"
+            className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
           >
             Título Oficial do Evento
           </label>
@@ -314,7 +326,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             placeholder="EX: 10K RIO DE JANEIRO CORRIDA"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+            className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors uppercase placeholder:text-ink-muted/40"
           />
         </div>
 
@@ -322,7 +334,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           <div className="space-y-2">
             <label
               htmlFor="date"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Data & Horário do Evento
             </label>
@@ -332,14 +344,14 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               required
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+              className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors"
             />
           </div>
 
           <div className="space-y-2">
             <label
               htmlFor="eventType"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Modalidade do Evento
             </label>
@@ -347,7 +359,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               id="eventType"
               value={eventType}
               onChange={(e) => setEventType(e.target.value)}
-              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase appearance-none"
+              className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors uppercase appearance-none"
             >
               <option value="CORRIDA">Corrida de Rua</option>
               <option value="ULTRA_TRAIL">Ultra Trail / Trilha</option>
@@ -364,7 +376,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
         <div className="space-y-2">
           <label
             htmlFor="slots"
-            className="text-[10px] uppercase block tracking-wider"
+            className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
           >
             Limite Físico Geral de Vagas
           </label>
@@ -375,7 +387,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             min="1"
             value={availableSlots}
             onChange={(e) => setAvailableSlots(Number(e.target.value))}
-            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors"
+            className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors"
           />
         </div>
 
@@ -383,7 +395,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           <div className="space-y-2">
             <label
               htmlFor="location"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Endereço (Texto)
             </label>
@@ -393,14 +405,14 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               placeholder="EX: PRAÇA PRINCIPAL, CENTRO"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+              className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors uppercase placeholder:text-ink-muted/40"
             />
           </div>
 
           <div className="space-y-2">
             <label
               htmlFor="locationUrl"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Link Iframe Google Maps
             </label>
@@ -410,21 +422,21 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               placeholder="https://www.google.com/maps/embed?pb=..."
               value={locationUrl}
               onChange={(e) => setLocationUrl(e.target.value)}
-              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+              className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors placeholder:text-ink-muted/40"
             />
           </div>
         </div>
 
-        {/* MÍDIAS DO EVENTO (CASO 3) */}
-        <div className="space-y-4 pt-6 border-t border-zinc-800/60">
-          <h3 className="font-heading text-lg font-bold text-white uppercase tracking-wider">
+        {/* MÍDIAS DO EVENTO */}
+        <div className="space-y-4 pt-6 border-t border-ink-muted/20">
+          <h3 className="font-heading text-base md:text-lg font-bold text-ink uppercase tracking-wider">
             Mídia e Identidade Visual
           </h3>
 
           <div className="space-y-2">
             <label
               htmlFor="bannerUrl"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Banner Principal (URL ou Upload)
             </label>
@@ -435,9 +447,9 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 placeholder="https://..."
                 value={bannerUrl}
                 onChange={(e) => setBannerUrl(e.target.value)}
-                className="flex-grow bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+                className="flex-grow bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors placeholder:text-ink-muted/40"
               />
-              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
+              <label className="bg-surface border border-ink-muted/30 hover:border-accent text-ink text-xs md:text-sm px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
                 Selecionar
                 <input
                   type="file"
@@ -457,7 +469,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               <img
                 src={bannerUrl}
                 alt="Preview Banner"
-                className="h-24 w-auto object-cover border border-zinc-800 mt-2"
+                className="h-24 w-auto object-cover border border-ink-muted/20 mt-2"
               />
             )}
           </div>
@@ -465,7 +477,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           <div className="space-y-2">
             <label
               htmlFor="logoUrl"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Logo da Organização (URL ou Upload)
             </label>
@@ -476,9 +488,9 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 placeholder="https://..."
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
-                className="flex-grow bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+                className="flex-grow bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors placeholder:text-ink-muted/40"
               />
-              <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
+              <label className="bg-surface border border-ink-muted/30 hover:border-accent text-ink text-xs md:text-sm px-4 py-3 cursor-pointer transition-colors uppercase flex items-center justify-center font-bold tracking-wider">
                 Selecionar
                 <input
                   type="file"
@@ -498,7 +510,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               <img
                 src={logoUrl}
                 alt="Preview Logo"
-                className="h-16 w-16 object-cover border border-zinc-800 mt-2 rounded-full"
+                className="h-16 w-16 object-cover border border-ink-muted/20 mt-2 rounded-full"
               />
             )}
           </div>
@@ -506,7 +518,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           <div className="space-y-2">
             <label
               htmlFor="trailerUrl"
-              className="text-[10px] uppercase block tracking-wider"
+              className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink"
             >
               Trailer / Vídeo Promocional (YouTube Embed URL)
             </label>
@@ -516,15 +528,15 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               placeholder="https://www.youtube.com/embed/..."
               value={trailerUrl}
               onChange={(e) => setTrailerUrl(e.target.value)}
-              className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+              className="w-full bg-surface border border-ink-muted/30 text-ink text-sm md:text-base px-4 py-3 outline-none focus:border-accent transition-colors placeholder:text-ink-muted/40"
             />
           </div>
         </div>
 
-        <div className="space-y-2 font-sans pt-6 border-t border-zinc-800/60">
+        <div className="space-y-2 font-sans pt-6 border-t border-ink-muted/20">
           <label
             htmlFor="desc"
-            className="text-[10px] font-mono uppercase block tracking-wider text-zinc-400"
+            className="text-xs md:text-sm font-mono uppercase block tracking-wider font-semibold text-ink"
           >
             Regulamento / Informações Básicas
           </label>
@@ -534,24 +546,24 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
             placeholder="Insira detalhes sobre regulamento, local da largada, entrega de kits, premiação..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs placeholder:text-zinc-700"
+            className="w-full bg-surface border border-ink-muted/30 text-ink px-4 py-3 outline-none focus:border-accent transition-colors text-sm md:text-base placeholder:text-ink-muted/40"
           />
         </div>
 
         {/* CONTRATO / REGULAMENTO */}
-        <div className="space-y-4 mb-8 border-t border-zinc-800/60 pt-6 font-sans">
+        <div className="space-y-4 mb-8 border-t border-ink-muted/20 pt-6 font-sans">
           <div>
-            <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+            <h3 className="font-heading text-base md:text-lg font-bold text-ink uppercase tracking-wider">
               Contrato / Regulamento Oficial
             </h3>
-            <p className="text-zinc-500 text-[10px] mt-1 font-mono uppercase">
+            <p className="text-ink-muted text-xs mt-1 font-mono uppercase">
               Escolha o formato do contrato. Se ambos forem deixados em branco,
               o contrato padrão será exibido.
             </p>
           </div>
 
-          <div className="flex gap-4 font-mono text-xs mb-4">
-            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
+          <div className="flex gap-6 font-mono text-xs md:text-sm mb-4">
+            <label className="flex items-center gap-2 cursor-pointer text-ink font-semibold">
               <input
                 type="radio"
                 name="editContractType"
@@ -561,7 +573,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               />
               Texto / Markdown
             </label>
-            <label className="flex items-center gap-2 cursor-pointer text-zinc-300">
+            <label className="flex items-center gap-2 cursor-pointer text-ink font-semibold">
               <input
                 type="radio"
                 name="editContractType"
@@ -578,7 +590,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <label
                   htmlFor="contractText"
-                  className="text-[10px] font-mono uppercase tracking-wider text-zinc-400"
+                  className="text-xs md:text-sm font-mono uppercase tracking-wider font-semibold text-ink"
                 >
                   Texto do Regulamento
                 </label>
@@ -586,14 +598,14 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   <button
                     type="button"
                     onClick={() => setShowMarkdownPreview(!showMarkdownPreview)}
-                    className="text-[9px] font-mono text-zinc-400 hover:text-white uppercase tracking-wider cursor-pointer border border-zinc-800 px-2 py-1"
+                    className="text-xs font-mono text-ink-muted hover:text-ink uppercase tracking-wider cursor-pointer border border-ink-muted/30 hover:border-ink-muted px-2.5 py-1"
                   >
                     {showMarkdownPreview ? "Editar Texto" : "Preview Markdown"}
                   </button>
                   <button
                     type="button"
                     onClick={handleSuggestContract}
-                    className="text-[9px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-wider cursor-pointer font-bold"
+                    className="text-xs font-mono text-emerald-600 dark:text-emerald-400 hover:opacity-80 uppercase tracking-wider cursor-pointer font-bold"
                   >
                     Sugerir Contrato Padrão
                   </button>
@@ -602,7 +614,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               
               {showMarkdownPreview ? (
                 <div 
-                  className="w-full bg-[#0d0e12] border border-zinc-800 p-4 max-h-64 overflow-y-auto text-zinc-300 text-xs font-sans markdown-body"
+                  className="w-full bg-surface border border-ink-muted/20 p-4 max-h-64 overflow-y-auto text-ink text-xs md:text-sm font-sans markdown-body"
                   dangerouslySetInnerHTML={{ __html: marked.parse(contractText || 'Nenhum texto inserido.') }}
                 />
               ) : (
@@ -612,7 +624,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   placeholder="Insira os termos de responsabilidade do evento, regras gerais, políticas de reembolso..."
                   value={contractText}
                   onChange={(e) => setContractText(e.target.value)}
-                  className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs font-mono placeholder:text-zinc-700"
+                  className="w-full bg-surface border border-ink-muted/30 text-ink px-4 py-3 outline-none focus:border-accent transition-colors text-xs md:text-sm font-mono placeholder:text-ink-muted/40"
                 />
               )}
             </div>
@@ -620,21 +632,21 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
           {contractType === "PDF" && (
             <div className="space-y-2 font-mono">
-              <label className="text-[10px] uppercase block tracking-wider text-zinc-400">
+              <label className="text-xs md:text-sm uppercase block tracking-wider font-semibold text-ink">
                 Arquivo PDF do Regulamento
               </label>
               <input
                 type="file"
                 accept="application/pdf"
                 onChange={handlePdfUpload}
-                className="w-full bg-[#0d0e12] border border-zinc-800 text-zinc-300 px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-xs"
+                className="w-full bg-surface border border-ink-muted/30 text-ink px-4 py-3 outline-none focus:border-accent transition-colors text-xs md:text-sm"
               />
               {contractFile ? (
-                <div className="text-[10px] text-emerald-400 uppercase mt-1">
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 uppercase mt-1 font-semibold">
                   ✓ PDF Selecionado: {contractFile.name} (Pronto para salvar)
                 </div>
               ) : event.contractPdf && (
-                <div className="text-[10px] text-emerald-400 uppercase mt-1">
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 uppercase mt-1 font-semibold">
                   ✓ PDF já cadastrado na plataforma
                 </div>
               )}
@@ -645,14 +657,14 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
       {/* CATEGORIAS DO EVENTO */}
       <div className="space-y-4 mb-8">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+        <div className="flex items-center justify-between border-b border-ink-muted/20 pb-3">
+          <h3 className="font-heading text-base md:text-lg font-bold text-ink uppercase tracking-wider">
             Categorias Oficiais
           </h3>
           <button
             type="button"
             onClick={addCategory}
-            className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-widest cursor-pointer font-bold"
+            className="text-xs md:text-sm font-mono text-emerald-600 dark:text-emerald-400 hover:opacity-80 uppercase tracking-widest cursor-pointer font-bold"
           >
             + Adicionar Categoria
           </button>
@@ -662,10 +674,10 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           {categories.map((cat, index) => (
             <div
               key={index}
-              className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs"
+              className="bg-surface border border-ink-muted/20 p-4 md:p-5 flex flex-col md:flex-row gap-4 items-end font-mono text-xs md:text-sm"
             >
               <div className="flex-grow space-y-2 w-full">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs text-ink-muted uppercase tracking-wider font-semibold">
                   Nome da Categoria
                 </label>
                 <input
@@ -676,12 +688,12 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   onChange={(e) =>
                     updateCategory(index, "name", e.target.value)
                   }
-                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                  className="w-full bg-surface-alt border border-ink-muted/30 text-ink text-sm px-3 py-2.5 outline-none focus:border-accent transition-colors uppercase placeholder:text-ink-muted/40"
                 />
               </div>
 
               <div className="w-full md:w-48 space-y-2">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs text-ink-muted uppercase tracking-wider font-semibold">
                   Gênero Aceito
                 </label>
                 <select
@@ -689,7 +701,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   onChange={(e) =>
                     updateCategory(index, "gender", e.target.value)
                   }
-                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full bg-surface-alt border border-ink-muted/30 text-ink text-sm px-3 py-2.5 outline-none focus:border-accent transition-colors"
                 >
                   <option value="OPEN">MISTO / LIVRE</option>
                   <option value="MALE">MASCULINO</option>
@@ -698,7 +710,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
               </div>
 
               <div className="w-full md:w-36 space-y-2">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs text-ink-muted uppercase tracking-wider font-semibold">
                   Vagas Específicas
                 </label>
                 <input
@@ -709,7 +721,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   onChange={(e) =>
                     updateCategory(index, "slots", Number(e.target.value))
                   }
-                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full bg-surface-alt border border-ink-muted/30 text-ink text-sm px-3 py-2.5 outline-none focus:border-accent transition-colors"
                 />
               </div>
 
@@ -717,7 +729,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 <button
                   type="button"
                   onClick={() => removeCategory(index)}
-                  className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 hover:bg-red-500/20 transition-all text-[10px] uppercase tracking-wider cursor-pointer"
+                  className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 px-3 py-2.5 hover:bg-red-500/20 transition-all text-xs uppercase tracking-wider cursor-pointer font-bold"
                 >
                   Remover
                 </button>
@@ -729,14 +741,14 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
       {/* LOTES DO EVENTO */}
       <div className="space-y-4 mb-8">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 className="font-heading text-xs font-bold text-white uppercase tracking-wider">
+        <div className="flex items-center justify-between border-b border-ink-muted/20 pb-3">
+          <h3 className="font-heading text-base md:text-lg font-bold text-ink uppercase tracking-wider">
             Lotes de Inscrição
           </h3>
           <button
             type="button"
             onClick={addBatch}
-            className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 uppercase tracking-widest cursor-pointer font-bold"
+            className="text-xs md:text-sm font-mono text-emerald-600 dark:text-emerald-400 hover:opacity-80 uppercase tracking-widest cursor-pointer font-bold"
           >
             + Adicionar Lote
           </button>
@@ -746,10 +758,10 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
           {batches.map((bat, index) => (
             <div
               key={index}
-              className="bg-[#0d0e12] border border-zinc-900 p-4 flex flex-col md:flex-row gap-4 items-end font-mono text-xs"
+              className="bg-surface border border-ink-muted/20 p-4 md:p-5 flex flex-col md:flex-row gap-4 items-end font-mono text-xs md:text-sm"
             >
               <div className="flex-grow space-y-2 w-full">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs text-ink-muted uppercase tracking-wider font-semibold">
                   Nome do Lote
                 </label>
                 <input
@@ -758,12 +770,12 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   placeholder="EX: LOTE PROMOCIONAL ou 2º LOTE"
                   value={bat.name}
                   onChange={(e) => updateBatch(index, "name", e.target.value)}
-                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-zinc-800"
+                  className="w-full bg-surface-alt border border-ink-muted/30 text-ink text-sm px-3 py-2.5 outline-none focus:border-accent transition-colors uppercase placeholder:text-ink-muted/40"
                 />
               </div>
 
               <div className="w-full md:w-52 space-y-2">
-                <label className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs text-ink-muted uppercase tracking-wider font-semibold">
                   Preço Inscrição (R$)
                 </label>
                 <input
@@ -774,7 +786,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                   placeholder="99.90"
                   value={bat.price}
                   onChange={(e) => updateBatch(index, "price", e.target.value)}
-                  className="w-full bg-[#15171f] border border-zinc-800 text-zinc-300 px-3 py-2 outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-800"
+                  className="w-full bg-surface-alt border border-ink-muted/30 text-ink text-sm px-3 py-2.5 outline-none focus:border-accent transition-colors placeholder:text-ink-muted/40"
                 />
               </div>
 
@@ -782,7 +794,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
                 <button
                   type="button"
                   onClick={() => removeBatch(index)}
-                  className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 hover:bg-red-500/20 transition-all text-[10px] uppercase tracking-wider cursor-pointer"
+                  className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 px-3 py-2.5 hover:bg-red-500/20 transition-all text-xs uppercase tracking-wider cursor-pointer font-bold"
                 >
                   Remover
                 </button>
@@ -793,29 +805,29 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
       </div>
 
       {errorMessage && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono p-4 mb-6 uppercase">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs md:text-sm font-mono p-4 mb-6 uppercase">
           ✕ {errorMessage}
         </div>
       )}
 
       {successMessage && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono p-4 mb-6 uppercase flex items-center gap-2">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs md:text-sm font-mono p-4 mb-6 uppercase flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
           {successMessage}
         </div>
       )}
 
-      <div className="pt-6 border-t border-zinc-800/60 flex items-center justify-between font-mono">
+      <div className="pt-6 border-t border-ink-muted/20 flex items-center justify-between font-mono">
         <a
           href="/painel-organizador"
-          className="border border-zinc-800 hover:border-zinc-700 text-zinc-500 hover:text-white text-xs uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
+          className="border border-ink-muted/30 hover:border-ink-muted text-ink-muted hover:text-ink text-xs md:text-sm uppercase px-6 py-3 tracking-widest font-semibold transition-all duration-200"
         >
           Cancelar
         </a>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
+          className="bg-emerald-500 hover:bg-emerald-600 text-black text-xs md:text-sm uppercase px-8 py-3.5 tracking-widest font-extrabold transition-all duration-200 cursor-pointer disabled:opacity-50"
         >
           {isSubmitting ? "SALVANDO ALTERAÇÕES..." : "SALVAR ALTERAÇÕES"}
         </button>

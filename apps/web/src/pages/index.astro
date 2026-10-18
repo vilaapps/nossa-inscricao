@@ -75,7 +75,7 @@ const getStartingPrice = (event: any) => {
     
     <div class="max-w-7xl mx-auto relative z-10 flex flex-col items-start">
       <!-- Tag superior -->
-      <div class="flex items-center gap-2 mb-6 text-[10px] font-sans font-bold uppercase tracking-widest text-accent">
+      <div class="flex items-center gap-2 mb-6 text-xs font-sans font-bold uppercase tracking-widest text-accent">
         <span class="w-2 h-2 bg-accent animate-pulse"></span>
         INSCRIÇÕES ABERTAS
       </div>
@@ -95,15 +95,15 @@ const getStartingPrice = (event: any) => {
       <!-- Stats do HUD na lateral inferior -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-8 border-t-2 border-ink pt-8 w-full max-w-3xl font-sans">
         <div>
-          <div class="text-[10px] text-ink-muted font-bold uppercase tracking-wider">Eventos Ativos</div>
+          <div class="text-xs text-ink-muted font-bold uppercase tracking-wider">Eventos Ativos</div>
           <div class="text-3xl font-heading font-black text-ink mt-1">{events.length}</div>
         </div>
         <div>
-          <div class="text-[10px] text-ink-muted font-bold uppercase tracking-wider">Vagas Preenchidas</div>
+          <div class="text-xs text-ink-muted font-bold uppercase tracking-wider">Vagas Preenchidas</div>
           <div class="text-3xl font-heading font-black text-ink mt-1">{fillRate}%</div>
         </div>
         <div>
-          <div class="text-[10px] text-ink-muted font-bold uppercase tracking-wider">Atletas Inscritos</div>
+          <div class="text-xs text-ink-muted font-bold uppercase tracking-wider">Atletas Inscritos</div>
           <div class="text-3xl font-heading font-black text-ink mt-1">{filledSlots}</div>
         </div>
       </div>
@@ -161,7 +161,7 @@ const getStartingPrice = (event: any) => {
                 {event.bannerUrl ? (
                   <div class="w-full h-40 mb-4 bg-surface-alt border-2 border-ink relative overflow-hidden">
                     <img src={event.bannerUrl} alt={event.title} class="w-full h-full object-cover opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-transform duration-500" />
-                    <div class="absolute top-2 left-2 flex items-center justify-between w-[calc(100%-1rem)] font-sans text-[10px] tracking-widest z-10">
+                    <div class="absolute top-2 left-2 flex items-center justify-between w-[calc(100%-1rem)] font-sans text-xs tracking-widest z-10">
                       <span class="bg-surface text-accent border border-accent px-2 py-1 font-bold uppercase">{categoryBadge}</span>
                     </div>
                   </div>
