@@ -25,7 +25,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
               }
             : {
                 host: configService.get<string>('REDIS_HOST') || '127.0.0.1',
-                port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
+                port: parseInt(
+                  configService.get<string>('REDIS_PORT') || '6379',
+                  10,
+                ),
                 maxRetriesPerRequest: null,
                 enableReadyCheck: false,
               },
@@ -41,4 +44,3 @@ import { WebhooksModule } from './webhooks/webhooks.module';
   providers: [AppService],
 })
 export class AppModule {}
-

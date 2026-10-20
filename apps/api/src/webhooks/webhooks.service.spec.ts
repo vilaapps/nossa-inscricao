@@ -45,7 +45,7 @@ describe('WebhooksService', () => {
           signature: 'sig_abc_123',
           receivedAt: expect.any(String),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(result).toEqual({ success: true });
     });
@@ -61,7 +61,7 @@ describe('WebhooksService', () => {
         expect.objectContaining({
           signature: '', // fallback
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(result).toEqual({ success: true });
     });

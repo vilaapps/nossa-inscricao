@@ -2,7 +2,10 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   async onModuleInit() {
     await this.$connect();
   }
@@ -25,7 +28,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             return prisma.$transaction(async (tx: any) => {
               // Configura o ID do Tenant da sessão para RLS de forma parametrizada
               await tx.$executeRaw`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`;
-              
+
               if (userId) {
                 await tx.$executeRaw`SELECT set_config('app.current_user_id', ${userId}, true)`;
               }

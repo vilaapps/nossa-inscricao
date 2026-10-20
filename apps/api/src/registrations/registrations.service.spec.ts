@@ -57,7 +57,8 @@ describe('RegistrationsService', () => {
 
     service = module.get<RegistrationsService>(RegistrationsService);
     prisma = module.get<PrismaService>(PrismaService);
-    mockClerkClientInstance = (createClerkClient as jest.Mock).mock.results[0].value;
+    mockClerkClientInstance = (createClerkClient as jest.Mock).mock.results[0]
+      .value;
   });
 
   describe('create', () => {
@@ -73,16 +74,24 @@ describe('RegistrationsService', () => {
     it('should create registration and enqueue job when user already exists', async () => {
       // Arrange
       prisma.user.findUnique = jest.fn().mockResolvedValueOnce({ id: 'usr_1' });
-      prisma.event.findUnique = jest.fn().mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
-      prisma.registration.create = jest.fn().mockResolvedValueOnce({ id: 'reg_1' });
+      prisma.event.findUnique = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
+      prisma.registration.create = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'reg_1' });
 
       // Act
       const result = await service.create('usr_1', createDto);
 
       // Assert
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'usr_1' } });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'usr_1' },
+      });
       expect(prisma.user.create).not.toHaveBeenCalled();
-      expect(prisma.event.findUnique).toHaveBeenCalledWith({ where: { id: 'evt_1' } });
+      expect(prisma.event.findUnique).toHaveBeenCalledWith({
+        where: { id: 'evt_1' },
+      });
       expect(prisma.registration.create).toHaveBeenCalledWith({
         data: {
           eventId: 'evt_1',
@@ -98,8 +107,11 @@ describe('RegistrationsService', () => {
       });
       expect(mockQueue.add).toHaveBeenCalledWith(
         'process-registration',
-        expect.objectContaining({ registrationId: 'reg_1', couponCode: 'SALE10' }),
-        expect.any(Object)
+        expect.objectContaining({
+          registrationId: 'reg_1',
+          couponCode: 'SALE10',
+        }),
+        expect.any(Object),
       );
       expect(result).toEqual({ id: 'reg_1' });
     });
@@ -114,15 +126,23 @@ describe('RegistrationsService', () => {
         emailAddresses: [{ emailAddress: 'john.doe@test.com' }],
       });
       prisma.user.create = jest.fn().mockResolvedValueOnce({ id: 'usr_2' });
-      prisma.event.findUnique = jest.fn().mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
-      prisma.registration.create = jest.fn().mockResolvedValueOnce({ id: 'reg_2' });
+      prisma.event.findUnique = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
+      prisma.registration.create = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'reg_2' });
 
       // Act
       await service.create('usr_2', createDto);
 
       // Assert
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'usr_2' } });
-      expect(mockClerkClientInstance.users.getUser).toHaveBeenCalledWith('usr_2');
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'usr_2' },
+      });
+      expect(mockClerkClientInstance.users.getUser).toHaveBeenCalledWith(
+        'usr_2',
+      );
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: {
           id: 'usr_2',
@@ -137,10 +157,16 @@ describe('RegistrationsService', () => {
     it('should create user with fallback if Clerk API fails', async () => {
       // Arrange
       prisma.user.findUnique = jest.fn().mockResolvedValueOnce(null);
-      mockClerkClientInstance.users.getUser.mockRejectedValueOnce(new Error('Clerk offline'));
+      mockClerkClientInstance.users.getUser.mockRejectedValueOnce(
+        new Error('Clerk offline'),
+      );
       prisma.user.create = jest.fn().mockResolvedValueOnce({ id: 'usr_3' });
-      prisma.event.findUnique = jest.fn().mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
-      prisma.registration.create = jest.fn().mockResolvedValueOnce({ id: 'reg_3' });
+      prisma.event.findUnique = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
+      prisma.registration.create = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'reg_3' });
 
       // Act
       await service.create('usr_3', createDto);
@@ -165,9 +191,15 @@ describe('RegistrationsService', () => {
         lastName: 'User',
         emailAddresses: [], // sem e-mail
       });
-      prisma.user.create = jest.fn().mockResolvedValueOnce({ id: 'usr_no_email' });
-      prisma.event.findUnique = jest.fn().mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
-      prisma.registration.create = jest.fn().mockResolvedValueOnce({ id: 'reg_no_email' });
+      prisma.user.create = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'usr_no_email' });
+      prisma.event.findUnique = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'evt_1', tenantId: 'ten_1' });
+      prisma.registration.create = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 'reg_no_email' });
 
       // Act
       await service.create('usr_no_email', createDto);

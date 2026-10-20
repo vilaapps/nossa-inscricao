@@ -79,7 +79,7 @@ describe('PrismaService', () => {
     const mockTx = {
       $executeRaw: jest.fn().mockResolvedValue(undefined),
     };
-    
+
     mockTransaction.mockImplementation(async (callback: any) => {
       return callback(mockTx);
     });
@@ -119,7 +119,7 @@ describe('PrismaService', () => {
     const mockTx = {
       $executeRaw: jest.fn().mockResolvedValue(undefined),
     };
-    
+
     mockTransaction.mockImplementation(async (callback: any) => {
       return callback(mockTx);
     });

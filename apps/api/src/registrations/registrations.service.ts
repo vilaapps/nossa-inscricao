@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { QueueName, RegistrationJobData } from '@syncflow/shared';
@@ -34,7 +38,9 @@ export class RegistrationsService {
         if (!email) {
           throw new Error('User email not found in Clerk');
         }
-        const name = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || null;
+        const name =
+          `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
+          null;
 
         user = await this.prisma.user.create({
           data: {

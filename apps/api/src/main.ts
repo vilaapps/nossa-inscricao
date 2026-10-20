@@ -50,7 +50,9 @@ async function bootstrap() {
   // Configuração do Swagger
   const config = new DocumentBuilder()
     .setTitle('SyncFlow API')
-    .setDescription('API de alto desempenho para inscrições em eventos do SyncFlow')
+    .setDescription(
+      'API de alto desempenho para inscrições em eventos do SyncFlow',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -61,6 +63,8 @@ async function bootstrap() {
   const port = process.env.API_PORT ?? 3001;
   await app.listen(port);
   console.log(`🚀 API do SyncFlow rodando em: http://localhost:${port}/api`);
-  console.log(`📖 Documentação Swagger disponível em: http://localhost:${port}/docs`);
+  console.log(
+    `📖 Documentação Swagger disponível em: http://localhost:${port}/docs`,
+  );
 }
 bootstrap();

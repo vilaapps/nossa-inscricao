@@ -22,12 +22,17 @@ export class CreateRegistrationDto {
   @IsOptional()
   couponCode?: string;
 
-  @ApiPropertyOptional({ description: 'Dados complementares do formulário customizado do evento' })
+  @ApiPropertyOptional({
+    description: 'Dados complementares do formulário customizado do evento',
+  })
   @IsObject()
   @IsOptional()
   complementaryData?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Método de pagamento selecionado', enum: ['PIX', 'CREDIT_CARD'] })
+  @ApiPropertyOptional({
+    description: 'Método de pagamento selecionado',
+    enum: ['PIX', 'CREDIT_CARD'],
+  })
   @IsString()
   @IsOptional()
   paymentMethod?: 'PIX' | 'CREDIT_CARD';

@@ -15,9 +15,7 @@ describe('WebhooksController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WebhooksController],
-      providers: [
-        { provide: WebhooksService, useValue: mockWebhooksService },
-      ],
+      providers: [{ provide: WebhooksService, useValue: mockWebhooksService }],
     }).compile();
 
     controller = module.get<WebhooksController>(WebhooksController);

@@ -1,4 +1,11 @@
-import { Controller, Post, Body, Headers, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { WebhooksService } from './webhooks.service';
 
@@ -9,8 +16,13 @@ export class WebhooksController {
 
   @Post('asaas')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Recebe notificações de eventos de cobrança do Asaas' })
-  @ApiResponse({ status: 200, description: 'Notificação recebida e enfileirada com sucesso' })
+  @ApiOperation({
+    summary: 'Recebe notificações de eventos de cobrança do Asaas',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notificação recebida e enfileirada com sucesso',
+  })
   async handleAsaas(
     @Body() body: any,
     @Headers('asaas-signature') signature: string,
