@@ -44,12 +44,18 @@ export interface WebhookJobData {
   receivedAt: string;
 }
 
+export interface EmailAttachmentData {
+  filename: string;
+  content: string; // Base64 encoded string
+}
+
 export interface EmailJobData {
   to: string;
   subject: string;
   templateId: string;
   tenantId: string;
   variables: Record<string, string>;
+  attachments?: EmailAttachmentData[];
 }
 
 export interface ApiResponse<T = unknown> {

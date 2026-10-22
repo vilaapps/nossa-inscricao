@@ -508,8 +508,9 @@ describe('Registration Processor', () => {
     expect(updateRegSpy).toHaveBeenCalledWith({
       where: { id: 'reg_1' },
       data: expect.objectContaining({
-        status: 'PENDING',
-        amountPaid: 0, // Minimo zero
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        amountPaid: 0,
         couponId: 'coup_123',
       }),
     });
@@ -784,12 +785,14 @@ describe('Registration Processor', () => {
         status: 'PENDING',
         amountPaid: 110.00,
         couponId: null,
+        receiptCode: expect.any(String),
         metadata: {
           paymentMethod: 'PIX',
           cpf: '12345678900',
           subtotal: 100.00,
           adminFee: 10.00,
           commissionRate: 10.00,
+          receiptCode: expect.any(String),
         },
       },
     });
@@ -860,12 +863,14 @@ describe('Registration Processor', () => {
         status: 'PENDING',
         amountPaid: 88.00,
         couponId: 'cupom_20',
+        receiptCode: expect.any(String),
         metadata: {
           paymentMethod: 'PIX',
           cpf: '12345678900',
           subtotal: 80.00,
           adminFee: 8.00,
           commissionRate: 10.00,
+          receiptCode: expect.any(String),
         },
       },
     });
@@ -874,5 +879,677 @@ describe('Registration Processor', () => {
       registrationId: 'reg_fee_coupon',
       amount: 88.00,
     }));
+  });
+
+  // deve tratar evento gratuito (lote R$ 0) confirmando imediatamente sem chamar fila de pagamento
+  it('should treat free event (batch price 0) confirming immediately without payment queue', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_free_1',
+      userId: 'usr_1',
+      eventId: 'evt_free',
+      categoryId: 'cat_free',
+      batchId: 'bat_free',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = { id: 'evt_free', availableSlots: 50, title: 'Treinão Social' };
+    const mockCategory = { id: 'cat_free', availableSlots: 50 };
+    const mockBatch = { id: 'bat_free', price: 0, maxQuantity: 50, soldQuantity: 0 };
+    const mockReg = {
+      id: 'reg_free_1',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX', cpf: '12345678900' },
+      user: { email: 'free@test.com', name: 'Atleta Social' },
+    };
+
+    const updateRegSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 10.00 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_free_1' },
+      data: expect.objectContaining({
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        amountPaid: 0,
+        receiptCode: expect.any(String),
+      }),
+    });
+
+    // Fila de pagamento NUNCA deve ser chamada
+    expect(mockQueue.add).not.toHaveBeenCalledWith('process-payment', expect.anything());
+    // Fila de e-mail deve ser chamada para confirmação
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      templateId: 'REGISTRATION_CONFIRMED',
+      to: 'free@test.com',
+    }));
+  });
+
+  // deve confirmar inscrição gratuita com kit e anexar PDF gerado
+  it('should confirm free registration with kit and attach generated PDF', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_free_kit',
+      userId: 'usr_1',
+      eventId: 'evt_free_kit',
+      categoryId: 'cat_free_kit',
+      batchId: 'bat_free_kit',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = {
+      id: 'evt_free_kit',
+      availableSlots: 50,
+      title: 'Treinão com Kit',
+      date: new Date('2026-11-20'),
+      location: 'Parque Central',
+      hasKit: true,
+    };
+    const mockCategory = { id: 'cat_free_kit', availableSlots: 50, name: '5KM' };
+    const mockBatch = { id: 'bat_free_kit', price: 0, maxQuantity: 50, soldQuantity: 0, name: 'Lote 1' };
+    const mockReg = {
+      id: 'reg_free_kit',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX', shirtSize: 'GG', cpf: '12345678900' },
+      user: { email: 'free_kit@test.com', name: 'Atleta com Kit', cpf: '12345678900' },
+      athleteBirthDate: new Date('1990-01-01'),
+      athleteGender: 'F',
+    };
+
+    const updateRegSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 10.00 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_free_kit' },
+      data: expect.objectContaining({
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        amountPaid: 0,
+      }),
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      templateId: 'REGISTRATION_CONFIRMED',
+      to: 'free_kit@test.com',
+      attachments: expect.arrayContaining([
+        expect.objectContaining({
+          filename: expect.stringMatching(/^comprovante-.*\.pdf$/),
+          content: expect.any(String),
+        }),
+      ]),
+    }));
+  });
+
+  // deve confirmar inscrição gratuita e enviar e-mail mesmo se a geração de PDF falhar
+  it('should confirm free registration and enqueue email without attachment if renderReceiptPdf fails', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_free_pdf_fail',
+      userId: 'usr_1',
+      eventId: 'evt_free',
+      categoryId: 'cat_free',
+      batchId: 'bat_free',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = { id: 'evt_free', availableSlots: 50, title: 'Treinão Social', hasKit: true };
+    const mockCategory = { id: 'cat_free', availableSlots: 50, name: 'Geral' };
+    const mockBatch = { id: 'bat_free', price: 0, maxQuantity: 50, soldQuantity: 0, name: 'Lote 1' };
+    const mockReg = {
+      id: 'reg_free_pdf_fail',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX', complementaryData: { shirtSize: 'M' } },
+      user: { email: 'free_fail@test.com', name: null, cpf: null },
+      athleteBirthDate: new Date('1995-05-10'),
+      athleteGender: 'M',
+    };
+
+    const updateRegSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 10.00 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const sharedModule = await import('@syncflow/shared');
+    const renderSpy = vi.spyOn(sharedModule, 'renderReceiptPdf').mockRejectedValueOnce(new Error('PDF Kit crashed'));
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_free_pdf_fail' },
+      data: expect.objectContaining({
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        amountPaid: 0,
+      }),
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      templateId: 'REGISTRATION_CONFIRMED',
+      to: 'free_fail@test.com',
+      attachments: undefined,
+    }));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[RegistrationProcessor] Falha ao gerar PDF de comprovante:'),
+      expect.any(Error)
+    );
+
+    renderSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  // deve respeitar override de taxa administrativa do evento = 0% mesmo com tenant a 10%
+  it('should respect event adminFeeRate override of 0% over tenant commissionRate of 10%', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_fee_override_zero',
+      userId: 'usr_1',
+      eventId: 'evt_override',
+      categoryId: 'cat_1',
+      batchId: 'bat_1',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = {
+      id: 'evt_override',
+      availableSlots: 10,
+      title: 'Desafio Sem Taxa',
+      adminFeeRate: 0, // Override explícito de 0%
+    };
+    const mockCategory = { id: 'cat_1', availableSlots: 5 };
+    const mockBatch = { id: 'bat_1', price: 100.00, maxQuantity: 20, soldQuantity: 0 };
+    const mockReg = {
+      id: 'reg_fee_override_zero',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX', cpf: '12345678900' },
+      user: { email: 'participant@test.com', name: 'John Doe' },
+    };
+
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 10.00 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert: Taxa 0% -> adminFee: 0, total: 100
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_fee_override_zero' },
+      data: expect.objectContaining({
+        status: 'PENDING',
+        amountPaid: 100.00,
+        metadata: expect.objectContaining({
+          adminFee: 0,
+          commissionRate: 0,
+          subtotal: 100.00,
+        }),
+      }),
+    });
+  });
+
+  // deve rejeitar inscrição e notificar lote encerrado se o lote por data expirou
+  it('should reject registration and send REGISTRATION_BATCH_CLOSED if DATE batch has expired', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_batch_expired',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_expired',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = { id: 'evt_1', availableSlots: 10, title: 'Corrida' };
+    const mockCategory = { id: 'cat_1', availableSlots: 5 };
+    const mockBatch = {
+      id: 'bat_expired',
+      name: '1º Lote Expirado',
+      type: 'DATE',
+      price: 50.00,
+      endDate: new Date(Date.now() - 10000), // Expirou no passado
+      maxQuantity: null,
+      soldQuantity: 5,
+    };
+    const mockReg = {
+      id: 'reg_batch_expired',
+      status: 'QUEUED',
+      user: { email: 'expired@test.com', name: 'Atleta Atrasado' },
+    };
+
+    const updateRegSpy = vi.fn();
+    const eventUpdateSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: eventUpdateSpy },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert: inscrição rejeitada e vagas NÃO deduzidas
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_batch_expired' },
+      data: { status: 'REJECTED' },
+    });
+    expect(eventUpdateSpy).not.toHaveBeenCalled();
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      templateId: 'REGISTRATION_BATCH_CLOSED',
+      to: 'expired@test.com',
+    }));
+  });
+
+  // deve rejeitar inscrição e notificar lote encerrado com nome fallback se o lote por quantidade esgotou
+  it('should reject registration and send REGISTRATION_BATCH_CLOSED when QUANTITY batch is sold out with fallback name', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_batch_sold_out',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_sold_out',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = { id: 'evt_1', availableSlots: 10, title: 'Corrida' };
+    const mockCategory = { id: 'cat_1', availableSlots: 5 };
+    const mockBatch = {
+      id: 'bat_sold_out',
+      name: 'Lote Esgotado',
+      type: 'QUANTITY',
+      price: 50.00,
+      maxQuantity: 20,
+      soldQuantity: 20, // soldQuantity >= maxQuantity
+    };
+    const mockReg = {
+      id: 'reg_batch_sold_out',
+      status: 'QUEUED',
+      user: { email: 'noname@test.com', name: null }, // nome nulo -> fallback 'Participante'
+    };
+
+    const updateRegSpy = vi.fn();
+    const eventUpdateSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+        event: { update: eventUpdateSpy },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_batch_sold_out' },
+      data: { status: 'REJECTED' },
+    });
+    expect(eventUpdateSpy).not.toHaveBeenCalled();
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      templateId: 'REGISTRATION_BATCH_CLOSED',
+      to: 'noname@test.com',
+      variables: expect.objectContaining({
+        userName: 'Participante',
+      }),
+    }));
+  });
+
+  // deve usar fallback de nome de participante no e-mail de evento gratuito
+  it('should use fallback name when participant has no name in free event confirmation', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_free_no_name',
+      userId: 'usr_1',
+      eventId: 'evt_free',
+      categoryId: 'cat_free',
+      batchId: 'bat_free',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = { id: 'evt_free', availableSlots: 10, title: 'Treinão' };
+    const mockCategory = { id: 'cat_free', availableSlots: 10 };
+    const mockBatch = { id: 'bat_free', price: 0, maxQuantity: 50, soldQuantity: 0 };
+    const mockReg = {
+      id: 'reg_free_no_name',
+      status: 'QUEUED',
+      metadata: { paymentMethod: 'PIX' },
+      user: { email: 'noname@test.com', name: null },
+    };
+
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        tenant: {
+          findUnique: vi.fn().mockResolvedValueOnce({ id: 'ten_1', commissionRate: 0 }),
+        },
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: vi.fn(),
+        },
+        event: { update: vi.fn() },
+        category: { update: vi.fn() },
+        batch: { update: vi.fn() },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      variables: expect.objectContaining({
+        athleteName: 'Participante',
+      }),
+    }));
+  });
+
+  // deve rejeitar inscrição e enviar e-mail REGISTRATION_BATCH_NOT_STARTED se o lote ainda não abriu
+  it('should reject registration and send REGISTRATION_BATCH_NOT_STARTED if batch has not started', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_not_started',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_not_started',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = {
+      id: 'evt_1',
+      title: 'Treinão Futuro',
+      availableSlots: 50,
+      registrationOpensAt: null,
+    };
+    const mockCategory = { id: 'cat_1', availableSlots: 20 };
+    const mockBatch = {
+      id: 'bat_not_started',
+      name: 'Lote Futuro',
+      type: 'DATE',
+      startDate: new Date(Date.now() + 86400000 * 2),
+      endDate: new Date(Date.now() + 86400000 * 10),
+      soldQuantity: 0,
+      maxQuantity: 100,
+      price: 100,
+    };
+    const mockReg = {
+      id: 'reg_not_started',
+      status: 'QUEUED',
+      user: { email: 'athlete@test.com', name: null },
+      metadata: {},
+    };
+
+    const updateRegSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_not_started' },
+      data: { status: 'REJECTED' },
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      to: 'athlete@test.com',
+      templateId: 'REGISTRATION_BATCH_NOT_STARTED',
+      variables: expect.objectContaining({
+        userName: 'Participante',
+      }),
+    }));
+  });
+
+  // deve rejeitar inscrição se as inscrições do evento ainda não abriram
+  it('should reject registration if event registrationOpensAt is in the future', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_event_not_started',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_1',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = {
+      id: 'evt_1',
+      title: 'Treinão Futuro',
+      availableSlots: 50,
+      registrationOpensAt: new Date(Date.now() + 86400000 * 5),
+    };
+    const mockCategory = { id: 'cat_1', availableSlots: 20 };
+    const mockBatch = {
+      id: 'bat_1',
+      name: 'Lote 1',
+      type: 'QUANTITY',
+      soldQuantity: 0,
+      maxQuantity: 100,
+      price: 100,
+    };
+    const mockReg = {
+      id: 'reg_event_not_started',
+      status: 'QUEUED',
+      user: { email: 'athlete@test.com', name: 'Atleta' },
+      metadata: {},
+    };
+
+    const updateRegSpy = vi.fn();
+    const mockEmailQueue = getQueue(QueueName.EMAIL);
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_event_not_started' },
+      data: { status: 'REJECTED' },
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      to: 'athlete@test.com',
+      templateId: 'REGISTRATION_BATCH_NOT_STARTED',
+    }));
+  });
+
+  // deve rejeitar inscrição se o evento não estiver publicado
+  it('should reject registration if event is not PUBLISHED in worker', async () => {
+    // Arrange
+    const job = createMockJob({
+      registrationId: 'reg_draft',
+      userId: 'usr_1',
+      eventId: 'evt_1',
+      categoryId: 'cat_1',
+      batchId: 'bat_1',
+      tenantId: 'ten_1',
+    });
+
+    const mockEvent = {
+      id: 'evt_1',
+      title: 'Treinão Rascunho',
+      status: 'DRAFT',
+      availableSlots: 50,
+    };
+    const mockCategory = { id: 'cat_1', availableSlots: 20 };
+    const mockBatch = {
+      id: 'bat_1',
+      name: 'Lote 1',
+      type: 'QUANTITY',
+      soldQuantity: 0,
+      maxQuantity: 100,
+      price: 100,
+    };
+    const mockReg = {
+      id: 'reg_draft',
+      status: 'QUEUED',
+      user: { email: 'athlete@test.com', name: 'Atleta' },
+      metadata: {},
+    };
+
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: vi.fn()
+          .mockResolvedValueOnce([mockEvent])
+          .mockResolvedValueOnce([mockCategory])
+          .mockResolvedValueOnce([mockBatch]),
+        registration: {
+          findUnique: vi.fn().mockResolvedValueOnce(mockReg),
+          update: updateRegSpy,
+        },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processRegistration(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_draft' },
+      data: { status: 'REJECTED' },
+    });
   });
 });

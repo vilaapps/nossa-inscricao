@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { PrismaClient } from '@prisma/client';
+import { validateEventPayload, normalizeEventPayload, validateBatchPlan, sanitizeGoogleMapsEmbedUrl, sanitizeYouTubeEmbedUrl } from '@syncflow/shared';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const auth = locals.auth();
@@ -30,21 +31,32 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const body = await request.json();
     
-    const { eventId, title, description, date, availableSlots, eventType, location, locationUrl, bannerUrl, logoUrl, trailerUrl, categories, batches, contractText, contractPdf } = body;
+    const { eventId, title, description, date, availableSlots, eventType, location, locationUrl, bannerUrl, logoUrl, trailerUrl, categories, batches, contractText, contractPdf, hasKit, kitSizes, adminFeeRate, registrationOpensAt } = body;
 
-    if (!eventId || !title || !date || !availableSlots) {
-      return new Response(JSON.stringify({ message: 'ID, título, data e limite de vagas são obrigatórios.' }), {
+    const validation = validateEventPayload({
+      name: title,
+      date,
+      registrationOpensAt,
+      hasKit,
+      kitSizes,
+      adminFeeRate,
+    });
+
+    if (!validation.valid) {
+      return new Response(JSON.stringify({ message: validation.errors.join(' ') }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const selectedDate = new Date(date);
-    const now = new Date();
-    
-    // O evento deve acontecer estritamente no futuro, mesmo na edição
-    if (selectedDate <= now) {
-      return new Response(JSON.stringify({ message: 'A data e horário do evento devem ser no futuro.' }), {
+    const normalized = normalizeEventPayload({
+      hasKit,
+      kitSizes,
+      adminFeeRate,
+    });
+
+    if (!eventId || !title || !date || !availableSlots) {
+      return new Response(JSON.stringify({ message: 'ID, título, data e limite de vagas são obrigatórios.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -57,7 +69,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    const totalCategorySlots = categories.reduce((sum: number, cat: any) => sum + Number(cat.slots || 0), 0);
+    const totalCategorySlots = categories.reduce((sum: number, cat: any) => sum + Number(cat.slots || cat.totalSlots || 0), 0);
     if (totalCategorySlots > Number(availableSlots)) {
       return new Response(JSON.stringify({ message: `A soma das vagas das categorias (${totalCategorySlots}) não pode ultrapassar o limite geral do evento (${availableSlots}).` }), {
         status: 400,
@@ -65,11 +77,43 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    if (!batches || batches.length === 0) {
-      return new Response(JSON.stringify({ message: 'O evento precisa ter pelo menos um lote ativo de inscrição.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    // Validar plano de lotes para cada categoria
+    for (const cat of categories) {
+      const catBatches = cat.batches && cat.batches.length > 0 ? cat.batches : batches;
+      if (!catBatches || catBatches.length === 0) {
+        return new Response(JSON.stringify({ message: `A categoria "${cat.name}" precisa ter pelo menos um lote ativo de inscrição.` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const categoryTotalSlots = Number(cat.slots || cat.totalSlots || availableSlots);
+      const batchPlanResult = validateBatchPlan(
+        catBatches.map((b: any, index: number) => ({
+          name: b.name,
+          type: b.type || 'DATE',
+          position: b.position !== undefined ? Number(b.position) : index + 1,
+          price: Number(b.price || 0),
+          startDate: b.startDate,
+          endDate: b.endDate,
+          maxQuantity: b.maxQuantity !== undefined && b.maxQuantity !== null && b.maxQuantity !== '' ? Number(b.maxQuantity) : null,
+        })),
+        {
+          name: cat.name,
+          totalSlots: categoryTotalSlots,
+        },
+        {
+          date,
+          registrationOpensAt,
+        },
+      );
+
+      if (!batchPlanResult.valid) {
+        return new Response(JSON.stringify({ message: `Categoria "${cat.name}": ${batchPlanResult.errors.join(' ')}` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // 1. Buscar o evento
@@ -138,18 +182,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
           slug,
           description: description || '',
           date: new Date(date),
+          registrationOpensAt: registrationOpensAt ? new Date(registrationOpensAt) : null,
           availableSlots: Number(availableSlots),
           eventType: eventType || 'CORRIDA',
+          hasKit: normalized.hasKit,
+          kitSizes: normalized.kitSizes,
+          adminFeeRate: normalized.adminFeeRate,
           location: location || null,
-          locationUrl: locationUrl || null,
+          locationUrl: sanitizeGoogleMapsEmbedUrl(locationUrl),
           bannerUrl: bannerUrl || null,
           logoUrl: logoUrl || null,
-          trailerUrl: trailerUrl || null,
+          trailerUrl: sanitizeYouTubeEmbedUrl(trailerUrl),
           contractText: contractText || null,
           contractPdf: contractPdf || null,
           status: targetStatus,
-          rejectionReason: null, // Limpa o motivo da rejeição
-          rejectedAt: null, // Limpa a data de rejeição
+          rejectionReason: null,
+          rejectedAt: null,
         },
       });
 
@@ -167,33 +215,49 @@ export const POST: APIRoute = async ({ request, locals }) => {
         await tx.category.deleteMany({ where: { eventId } });
         await tx.batch.deleteMany({ where: { eventId } });
 
-        await tx.category.createMany({
-          data: categories.map((cat: any) => ({
-            name: cat.name,
-            gender: cat.gender || 'MISTO',
-            price: 0,
-            availableSlots: Number(cat.slots || availableSlots),
-            tenantId: event.tenantId,
-            eventId,
-          })),
-        });
+        for (const cat of categories) {
+          const catTotalSlots = Number(cat.slots || cat.totalSlots || availableSlots);
+          const createdCategory = await tx.category.create({
+            data: {
+              eventId,
+              tenantId: event.tenantId,
+              name: cat.name,
+              gender: cat.gender || 'MISTO',
+              minAge: cat.minAge ? Number(cat.minAge) : null,
+              maxAge: cat.maxAge ? Number(cat.maxAge) : null,
+              price: 0,
+              totalSlots: catTotalSlots,
+              availableSlots: catTotalSlots,
+            },
+          });
 
-        await tx.batch.createMany({
-          data: batches.map((bat: any, index: number) => ({
-            name: bat.name,
-            price: bat.price.toString(),
-            active: index === 0,
-            tenantId: event.tenantId,
-            eventId,
-          })),
-        });
+          const catBatches = cat.batches && cat.batches.length > 0 ? cat.batches : batches;
+          for (let i = 0; i < catBatches.length; i++) {
+            const bat = catBatches[i];
+            await tx.batch.create({
+              data: {
+                eventId,
+                categoryId: createdCategory.id,
+                tenantId: event.tenantId,
+                name: bat.name,
+                price: bat.price.toString(),
+                type: bat.type || 'DATE',
+                position: bat.position !== undefined ? Number(bat.position) : i + 1,
+                startDate: bat.startDate ? new Date(bat.startDate) : null,
+                endDate: bat.endDate ? new Date(bat.endDate) : null,
+                maxQuantity: bat.maxQuantity !== undefined && bat.maxQuantity !== null && bat.maxQuantity !== '' ? Number(bat.maxQuantity) : null,
+                soldQuantity: 0,
+                active: i === 0,
+              },
+            });
+          }
+        }
       } else {
         // Existem inscrições: atualizar e proteger registros referenciados
         const currentCategories = await tx.category.findMany({ where: { eventId } });
         const currentBatches = await tx.batch.findMany({ where: { eventId } });
 
         const incomingCategoryIds = new Set(categories.map((c: any) => c.id).filter(Boolean));
-        const incomingBatchIds = new Set(batches.map((b: any) => b.id).filter(Boolean));
 
         // Deletar categorias não recebidas que não tenham inscrições
         for (const cat of currentCategories) {
@@ -204,57 +268,89 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
         // Atualizar ou criar categorias
         for (const cat of categories) {
+          const catTotalSlots = Number(cat.slots || cat.totalSlots || availableSlots);
+          let targetCategoryId = cat.id;
+
           if (cat.id && currentCategories.some((c) => c.id === cat.id)) {
             await tx.category.update({
               where: { id: cat.id },
               data: {
                 name: cat.name,
                 gender: cat.gender || 'MISTO',
-                availableSlots: Number(cat.slots || availableSlots),
+                minAge: cat.minAge ? Number(cat.minAge) : null,
+                maxAge: cat.maxAge ? Number(cat.maxAge) : null,
+                totalSlots: catTotalSlots,
+                availableSlots: catTotalSlots,
               },
             });
           } else {
-            await tx.category.create({
+            const created = await tx.category.create({
               data: {
                 name: cat.name,
                 gender: cat.gender || 'MISTO',
+                minAge: cat.minAge ? Number(cat.minAge) : null,
+                maxAge: cat.maxAge ? Number(cat.maxAge) : null,
                 price: 0,
-                availableSlots: Number(cat.slots || availableSlots),
+                totalSlots: catTotalSlots,
+                availableSlots: catTotalSlots,
                 tenantId: event.tenantId,
                 eventId,
               },
             });
+            targetCategoryId = created.id;
+          }
+
+          const catBatches = cat.batches && cat.batches.length > 0 ? cat.batches : batches;
+          const incomingCatBatchIds = new Set(catBatches.map((b: any) => b.id).filter(Boolean));
+
+          for (let index = 0; index < catBatches.length; index++) {
+            const bat = catBatches[index];
+            if (bat.id && currentBatches.some((b) => b.id === bat.id)) {
+              await tx.batch.update({
+                where: { id: bat.id },
+                data: {
+                  name: bat.name,
+                  price: bat.price.toString(),
+                  type: bat.type || 'DATE',
+                  position: bat.position !== undefined ? Number(bat.position) : index + 1,
+                  startDate: bat.startDate ? new Date(bat.startDate) : null,
+                  endDate: bat.endDate ? new Date(bat.endDate) : null,
+                  maxQuantity: bat.maxQuantity !== undefined && bat.maxQuantity !== null && bat.maxQuantity !== '' ? Number(bat.maxQuantity) : null,
+                  categoryId: targetCategoryId,
+                },
+              });
+            } else {
+              await tx.batch.create({
+                data: {
+                  name: bat.name,
+                  price: bat.price.toString(),
+                  type: bat.type || 'DATE',
+                  position: bat.position !== undefined ? Number(bat.position) : index + 1,
+                  startDate: bat.startDate ? new Date(bat.startDate) : null,
+                  endDate: bat.endDate ? new Date(bat.endDate) : null,
+                  maxQuantity: bat.maxQuantity !== undefined && bat.maxQuantity !== null && bat.maxQuantity !== '' ? Number(bat.maxQuantity) : null,
+                  soldQuantity: 0,
+                  active: index === 0,
+                  tenantId: event.tenantId,
+                  eventId,
+                  categoryId: targetCategoryId,
+                },
+              });
+            }
           }
         }
 
         // Deletar lotes não recebidos que não tenham inscrições
-        for (const bat of currentBatches) {
-          if (!incomingBatchIds.has(bat.id) && !usedBatchIds.has(bat.id)) {
-            await tx.batch.delete({ where: { id: bat.id } });
+        const allIncomingBatchIds = new Set<string>();
+        for (const cat of categories) {
+          const cBatches = cat.batches && cat.batches.length > 0 ? cat.batches : batches;
+          for (const b of cBatches) {
+            if (b.id) allIncomingBatchIds.add(b.id);
           }
         }
-
-        // Atualizar ou criar lotes
-        for (let index = 0; index < batches.length; index++) {
-          const bat = batches[index];
-          if (bat.id && currentBatches.some((b) => b.id === bat.id)) {
-            await tx.batch.update({
-              where: { id: bat.id },
-              data: {
-                name: bat.name,
-                price: bat.price.toString(),
-              },
-            });
-          } else {
-            await tx.batch.create({
-              data: {
-                name: bat.name,
-                price: bat.price.toString(),
-                active: index === 0,
-                tenantId: event.tenantId,
-                eventId,
-              },
-            });
+        for (const bat of currentBatches) {
+          if (!allIncomingBatchIds.has(bat.id) && !usedBatchIds.has(bat.id)) {
+            await tx.batch.delete({ where: { id: bat.id } });
           }
         }
       }

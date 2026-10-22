@@ -66,6 +66,12 @@ model Event {
   rejectedAt      DateTime?
   archivedAt      DateTime?
 
+  // Novas configurações: Kit, Taxa e Abertura
+  hasKit              Boolean   @default(false)
+  kitSizes            String[]  @default([])
+  adminFeeRate        Decimal?  @db.Decimal(5, 2)
+  registrationOpensAt DateTime?
+
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   categories     Category[]
@@ -89,9 +95,11 @@ model Category {
   minAge         Int?
   maxAge         Int?
   price          Decimal        @db.Decimal(10, 2)
+  totalSlots     Int            @default(0)       // Capacidade total/original
   availableSlots Int            // Vagas exclusivas da categoria
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+  batches        Batch[]
   registrations  Registration[]
 
   @@index([eventId])
@@ -102,10 +110,14 @@ model Batch {
   id                    String         @id @default(uuid())
   eventId               String
   event                 Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  categoryId            String?
+  category              Category?      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   tenantId              String
   tenant                Tenant         @relation(fields: [tenantId], references: [id])
   name                  String         // ex: "1º Lote", "Lote Promocional"
   price                 Decimal        @db.Decimal(10, 2)
+  type                  String         @default("DATE") // DATE ou QUANTITY
+  position              Int            @default(1)
   startDate             DateTime?
   endDate               DateTime?
   maxQuantity           Int?           // Limite de vendas neste lote
@@ -117,6 +129,7 @@ model Batch {
   registrations         Registration[]
 
   @@index([eventId])
+  @@index([categoryId])
   @@index([tenantId])
 }
 
@@ -142,26 +155,29 @@ model Coupon {
 }
 
 model Registration {
-  id            String         @id @default(uuid())
-  tenantId      String
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  eventId       String
-  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  categoryId    String
-  category      Category       @relation(fields: [categoryId], references: [id])
-  batchId       String
-  batch         Batch          @relation(fields: [batchId], references: [id])
-  userId        String         // Participante
-  user          User           @relation(fields: [userId], references: [id])
-  couponId      String?
-  coupon        Coupon?        @relation(fields: [couponId], references: [id])
-  status        String         @default("QUEUED") // QUEUED, PENDING, CONFIRMED, CANCELLED, REJECTED, EXPIRED
-  paymentStatus String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
-  amountPaid    Decimal        @db.Decimal(10, 2)
-  metadata      Json?          // dados customizados (tamanho da camiseta, etc.)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  payment       Payment?
+  id               String         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  eventId          String
+  event            Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  categoryId       String
+  category         Category       @relation(fields: [categoryId], references: [id])
+  batchId          String
+  batch            Batch          @relation(fields: [batchId], references: [id])
+  userId           String         // Participante
+  user             User           @relation(fields: [userId], references: [id])
+  couponId         String?
+  coupon           Coupon?        @relation(fields: [couponId], references: [id])
+  status           String         @default("QUEUED") // QUEUED, PENDING, CONFIRMED, CANCELLED, REJECTED, EXPIRED
+  paymentStatus    String         @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  amountPaid       Decimal        @db.Decimal(10, 2)
+  athleteBirthDate DateTime?
+  athleteGender    String?        // MASCULINO, FEMININO
+  receiptCode      String?        @unique
+  metadata         Json?          // dados customizados (tamanho da camiseta, etc.)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  payment          Payment?
 
   @@index([tenantId])
   @@index([eventId])

@@ -17,7 +17,9 @@ describe('ClerkAuthGuard', () => {
     guard = new ClerkAuthGuard();
   });
 
-  const createMockContext = (headers: Record<string, string>): ExecutionContext => {
+  const createMockContext = (
+    headers: Record<string, string>,
+  ): ExecutionContext => {
     const request = {
       headers,
       user: undefined,
@@ -87,17 +89,23 @@ describe('ClerkAuthGuard', () => {
     const request = context.switchToHttp().getRequest();
     expect(result).toBe(true);
     expect(request.user).toEqual({ id: 'usr_clerk_999' });
-    expect(verifyToken).toHaveBeenCalledWith('token_valido', { secretKey: 'some-key' });
+    expect(verifyToken).toHaveBeenCalledWith('token_valido', {
+      secretKey: 'some-key',
+    });
   });
 
   // deve lancar erro se o token for invalido no Clerk
   it('should throw UnauthorizedException if Clerk token verification fails', async () => {
     // Arrange
-    const context = createMockContext({ authorization: 'Bearer token_expirado' });
+    const context = createMockContext({
+      authorization: 'Bearer token_expirado',
+    });
     process.env.CLERK_SECRET_KEY = 'some-key';
     process.env.NODE_ENV = 'production';
 
-    (verifyToken as jest.Mock).mockRejectedValueOnce(new Error('Token expired'));
+    (verifyToken as jest.Mock).mockRejectedValueOnce(
+      new Error('Token expired'),
+    );
 
     // Act & Assert
     await expect(guard.canActivate(context)).rejects.toThrow(

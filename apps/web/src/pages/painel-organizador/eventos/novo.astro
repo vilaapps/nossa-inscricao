@@ -28,7 +28,7 @@ if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
 <BaseLayout title="Criar Novo — Painel Organizador">
   <!-- Cabeçalho HUD Simplificado -->
   <section class="bg-surface border-b border-ink-muted/20 py-8 px-6">
-    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
+    <div class="max-w-6xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
       <a href="/painel-organizador" class="hover:text-accent transition-colors uppercase flex items-center gap-1.5 mb-2">
         &larr; Voltar para o Dashboard
       </a>
@@ -41,7 +41,7 @@ if (!user || (user.role !== 'ORGANIZER' && user.role !== 'ADMIN')) {
   </section>
 
   <!-- Área do Formulário -->
-  <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full">
+  <section class="max-w-6xl mx-auto px-6 py-12 flex-grow w-full">
     <NewEventForm client:load />
   </section>
 </BaseLayout>

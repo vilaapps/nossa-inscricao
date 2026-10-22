@@ -144,4 +144,43 @@ describe('ResendService', () => {
       service.sendEmail('participant@example.com', 'Assunto', 'HTML')
     ).rejects.toThrow('Failed to send email: Invalid API key');
   });
+
+  // deve repassar anexos ao payload do Resend quando fornecidos
+  it('should pass attachments to Resend payload when provided', async () => {
+    // Arrange
+    const service = new ResendService();
+    const mockResendInstance = vi.mocked(Resend);
+    const mockSend = mockResendInstance.mock.results[0].value.emails.send;
+
+    mockSend.mockResolvedValue({
+      data: { id: 'email-with-attachment-id' },
+      error: null,
+    });
+
+    const attachments = [
+      { filename: 'comprovante.pdf', content: 'base64-content' },
+    ];
+
+    // Act
+    const result = await service.sendEmail(
+      'user@test.com',
+      'Assunto com anexo',
+      '<p>Comprovante</p>',
+      undefined,
+      undefined,
+      attachments,
+    );
+
+    // Assert
+    expect(result.id).toBe('email-with-attachment-id');
+    expect(mockSend).toHaveBeenCalledWith({
+      from: 'global@sender.com',
+      to: 'user@test.com',
+      subject: 'Assunto com anexo',
+      html: '<p>Comprovante</p>',
+      attachments: [
+        { filename: 'comprovante.pdf', content: 'base64-content' },
+      ],
+    });
+  });
 });

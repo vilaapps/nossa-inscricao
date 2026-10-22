@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { CouponsModule } from './coupons/coupons.module';
 
 @Module({
   imports: [
@@ -25,7 +26,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
               }
             : {
                 host: configService.get<string>('REDIS_HOST') || '127.0.0.1',
-                port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
+                port: parseInt(
+                  configService.get<string>('REDIS_PORT') || '6379',
+                  10,
+                ),
                 maxRetriesPerRequest: null,
                 enableReadyCheck: false,
               },
@@ -36,9 +40,9 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     PrismaModule,
     RegistrationsModule,
     WebhooksModule,
+    CouponsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
-

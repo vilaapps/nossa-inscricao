@@ -3,6 +3,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { QueueName } from '@syncflow/shared';
 import { RegistrationsController } from './registrations.controller';
 import { RegistrationsService } from './registrations.service';
+import { ReceiptService } from './receipt.service';
+import { VerificationController } from './verification.controller';
 
 @Module({
   imports: [
@@ -10,8 +12,8 @@ import { RegistrationsService } from './registrations.service';
       name: QueueName.REGISTRATION,
     }),
   ],
-  controllers: [RegistrationsController],
-  providers: [RegistrationsService],
-  exports: [RegistrationsService],
+  controllers: [RegistrationsController, VerificationController],
+  providers: [RegistrationsService, ReceiptService],
+  exports: [RegistrationsService, ReceiptService],
 })
 export class RegistrationsModule {}

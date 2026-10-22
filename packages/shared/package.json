@@ -4,10 +4,13 @@
   "private": true,
   "description": "Shared types, constants, and utilities for SyncFlow",
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./types": {
@@ -20,12 +23,21 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --dts",
-    "dev": "tsup src/index.ts --format cjs --dts --watch",
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run --coverage",
     "lint": "eslint src/"
   },
   "devDependencies": {
+    "@types/pdfkit": "^0.17.6",
+    "@types/qrcode": "^1.5.6",
+    "@vitest/coverage-v8": "^3.0.0",
     "tsup": "^8.3.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "pdfkit": "^0.20.2",
+    "qrcode": "^1.5.4"
   }
 }

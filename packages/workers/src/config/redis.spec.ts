@@ -22,9 +22,9 @@ describe('redisConnection Config', () => {
 
     // Assert
     expect(redisConnection).toBeDefined();
-    expect(redisConnection.url).toBe('redis://localhost:6379');
-    expect(redisConnection.maxRetriesPerRequest).toBeNull();
-    expect(redisConnection.enableReadyCheck).toBe(false);
+    expect((redisConnection as any).url).toBe('redis://localhost:6379');
+    expect((redisConnection as any).maxRetriesPerRequest).toBeNull();
+    expect((redisConnection as any).enableReadyCheck).toBe(false);
   });
 
   // deve lançar um erro quando a URL do Redis não estiver configurada

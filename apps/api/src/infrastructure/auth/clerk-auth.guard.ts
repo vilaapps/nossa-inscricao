@@ -13,7 +13,8 @@ export class ClerkAuthGuard implements CanActivate {
 
     // Em testes ou desenvolvimento local sem chaves ativas do Clerk, permite usar header x-user-id
     const userIdHeader = request.headers['x-user-id'];
-    const isTestOrDev = process.env.NODE_ENV === 'test' || !process.env.CLERK_SECRET_KEY;
+    const isTestOrDev =
+      process.env.NODE_ENV === 'test' || !process.env.CLERK_SECRET_KEY;
 
     if (isTestOrDev && userIdHeader) {
       request.user = { id: userIdHeader };
@@ -37,7 +38,9 @@ export class ClerkAuthGuard implements CanActivate {
       request.user = { id: verified.sub };
       return true;
     } catch (error) {
-      throw new UnauthorizedException(`Unauthorized: ${(error as Error).message}`);
+      throw new UnauthorizedException(
+        `Unauthorized: ${(error as Error).message}`,
+      );
     }
   }
 }

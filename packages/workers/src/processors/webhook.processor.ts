@@ -1,8 +1,13 @@
 import { Job } from 'bullmq';
 import { prisma } from '../services/prisma.service';
 import { getQueue } from '../config/queues';
-import { QueueName } from '@syncflow/shared';
-import { WebhookJobData, EmailJobData } from '@syncflow/shared';
+import {
+  QueueName,
+  WebhookJobData,
+  EmailJobData,
+  generateReceiptCode,
+  renderReceiptPdf,
+} from '@syncflow/shared';
 
 // Processador encarregado de sincronizar o banco com os webhooks do Asaas
 export async function processWebhook(job: Job<WebhookJobData>): Promise<void> {
@@ -29,6 +34,8 @@ export async function processWebhook(job: Job<WebhookJobData>): Promise<void> {
         include: {
           user: true,
           event: true,
+          category: true,
+          batch: true,
         },
       },
     },
@@ -44,6 +51,8 @@ export async function processWebhook(job: Job<WebhookJobData>): Promise<void> {
   if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
     // Só atualiza se ainda não estiver pago
     if (dbPayment.status !== 'PAID') {
+      const receiptCode = dbPayment.registration.receiptCode || generateReceiptCode();
+
       await prisma.$transaction(async (tx) => {
         await tx.payment.update({
           where: { id: dbPayment.id },
@@ -55,9 +64,41 @@ export async function processWebhook(job: Job<WebhookJobData>): Promise<void> {
           data: {
             status: 'CONFIRMED',
             paymentStatus: 'PAID',
+            receiptCode,
           },
         });
       });
+
+      // Gera comprovante PDF para anexar no e-mail (falha não bloqueia confirmação)
+      let attachments: any[] | undefined = undefined;
+      try {
+        const metadata = (dbPayment.registration.metadata as any) || {};
+        const rawShirtSize = metadata.shirtSize || metadata.complementaryData?.shirtSize || null;
+        const pdfBuffer = await renderReceiptPdf({
+          receiptCode,
+          eventName: dbPayment.registration.event.title,
+          eventDate: dbPayment.registration.event.date,
+          eventLocation: dbPayment.registration.event.location,
+          athleteName: dbPayment.registration.user.name || 'Participante',
+          athleteCpf: dbPayment.registration.user.cpf || metadata.cpf || '',
+          athleteBirthDate: dbPayment.registration.athleteBirthDate,
+          athleteGender: dbPayment.registration.athleteGender,
+          categoryName: dbPayment.registration.category?.name || 'Geral',
+          batchName: dbPayment.registration.batch?.name || 'Lote Oficial',
+          shirtSize: dbPayment.registration.event.hasKit ? rawShirtSize : null,
+          amountPaid: Number(dbPayment.amount || 0),
+          verificationUrl: `https://syncflow.com/verificar/${receiptCode}`,
+          issuedAt: new Date(),
+        });
+        attachments = [
+          {
+            filename: `comprovante-${receiptCode}.pdf`,
+            content: pdfBuffer.toString('base64'),
+          },
+        ];
+      } catch (pdfErr) {
+        console.error(`[WebhookProcessor] Falha ao gerar PDF de comprovante:`, pdfErr);
+      }
 
       // Envia e-mail de confirmação da inscrição
       const emailJobData: EmailJobData = {
@@ -69,6 +110,7 @@ export async function processWebhook(job: Job<WebhookJobData>): Promise<void> {
           userName: dbPayment.registration.user.name || 'Participante',
           eventName: dbPayment.registration.event.title,
         },
+        attachments,
       };
       await emailQueue.add('send-email', emailJobData);
     }

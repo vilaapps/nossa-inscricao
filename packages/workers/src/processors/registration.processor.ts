@@ -1,8 +1,16 @@
 import { Job } from 'bullmq';
 import { prisma } from '../services/prisma.service';
 import { getQueue } from '../config/queues';
-import { QueueName } from '@syncflow/shared';
-import { RegistrationJobData, PaymentJobData, EmailJobData } from '@syncflow/shared';
+import {
+  QueueName,
+  RegistrationJobData,
+  PaymentJobData,
+  EmailJobData,
+  calcOrder,
+  effectiveFeeRate,
+  generateReceiptCode,
+  renderReceiptPdf,
+} from '@syncflow/shared';
 import { cleanupExpiredRegistrations } from './cleanup-expired-registrations.processor';
 
 // Processador da fila de inscrições concorrentes com locks pessimistas
@@ -52,13 +60,23 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
       return;
     }
 
-    // 3. Validação lógica de estoque (Vagas livres)
-    const isEventAvailable = event.availableSlots > 0;
+    // 3. Validação lógica de lote sob lock e de estoque de vagas
+    const now = new Date();
+    const isEventNotPublished = event.status ? event.status !== 'PUBLISHED' : false;
+    const isEventDatePast = event.date ? now > new Date(event.date) : false;
+    const isEventNotStarted = event.registrationOpensAt ? now < new Date(event.registrationOpensAt) : false;
+
+    const isBatchActive = batch.active !== false;
+    const isBatchNotStarted = batch.type === 'DATE' && batch.startDate ? now < new Date(batch.startDate) : false;
+    const isBatchDateExpired = batch.type === 'DATE' && batch.endDate ? now > new Date(batch.endDate) : false;
+    const isBatchSoldOut = batch.maxQuantity !== null && batch.maxQuantity !== undefined ? batch.soldQuantity >= batch.maxQuantity : false;
+    const isBatchAvailable = isBatchActive && !isBatchNotStarted && !isBatchDateExpired && !isBatchSoldOut;
+
+    const isEventAvailable = !isEventNotPublished && !isEventDatePast && !isEventNotStarted && event.availableSlots > 0;
     const isCategoryAvailable = category.availableSlots > 0;
-    const isBatchAvailable = batch.maxQuantity === null || batch.soldQuantity < batch.maxQuantity;
 
     if (isEventAvailable && isCategoryAvailable && isBatchAvailable) {
-      // 3.1 Há vagas -> Dedução de vagas e alteração para PENDING
+      // 3.1 Há vagas e lote válido -> Dedução de vagas
       await tx.event.update({
         where: { id: eventId },
         data: { availableSlots: event.availableSlots - 1 },
@@ -75,11 +93,11 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
       });
 
       // Aplicação de desconto se houver cupom
-      let finalPrice = Number(batch.price);
+      let coupon: any = null;
       let couponId: string | null = null;
 
       if (couponCode) {
-        const coupon = await tx.coupon.findFirst({
+        coupon = await tx.coupon.findFirst({
           where: {
             eventId,
             code: couponCode,
@@ -93,49 +111,119 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
 
         if (coupon && (coupon.maxUses === null || coupon.usedCount < coupon.maxUses)) {
           couponId = coupon.id;
-          const discount = Number(coupon.discountValue);
-          if (coupon.discountType === 'PERCENTAGE') {
-            finalPrice = finalPrice * (1 - discount / 100);
-          } else if (coupon.discountType === 'FIXED') {
-            finalPrice = Math.max(0, finalPrice - discount);
-          }
-
           await tx.coupon.update({
             where: { id: coupon.id },
             data: { usedCount: coupon.usedCount + 1 },
           });
+        } else {
+          coupon = null;
         }
       }
 
-      // Aplicação de taxa administrativa (transferida para o usuário)
+      // Aplicação de taxa administrativa efetiva via regra compartilhada
       const tenant = tx.tenant ? await tx.tenant.findUnique({ where: { id: tenantId } }) : null;
-      const commissionRate = tenant?.commissionRate !== undefined && tenant?.commissionRate !== null
-        ? Number(tenant.commissionRate)
-        : 0;
+      const commissionRate = effectiveFeeRate(event, tenant);
 
-      const subtotal = finalPrice;
-      const adminFee = Number(((subtotal * commissionRate) / 100).toFixed(2));
-      const totalAmount = Number((subtotal + adminFee).toFixed(2));
+      const orderCalc = calcOrder({
+        basePrice: Number(batch.price),
+        coupon: coupon
+          ? {
+              code: coupon.code,
+              discountType: coupon.discountType as 'PERCENTAGE' | 'FIXED',
+              discountValue: Number(coupon.discountValue),
+            }
+          : null,
+        feeRate: commissionRate,
+      });
 
+      const receiptCode = registration.receiptCode || generateReceiptCode();
       const metadataObj = registration.metadata ? (registration.metadata as any) : {};
       const updatedMetadata = {
         ...metadataObj,
-        subtotal,
-        adminFee,
-        commissionRate,
+        subtotal: orderCalc.subtotal,
+        adminFee: orderCalc.adminFee,
+        commissionRate: orderCalc.feeRate,
+        receiptCode,
       };
 
+      // 3.2 Fluxo de Evento Gratuito ou Desconto de 100% (Item 2)
+      if (orderCalc.isFree) {
+        await tx.registration.update({
+          where: { id: registrationId },
+          data: {
+            status: 'CONFIRMED',
+            paymentStatus: 'PAID',
+            amountPaid: 0,
+            couponId,
+            receiptCode,
+            metadata: updatedMetadata,
+          },
+        });
+
+        // Gera comprovante PDF para anexar no e-mail (falha não bloqueia confirmação)
+        let attachments: any[] | undefined = undefined;
+        try {
+          const rawShirtSize = metadataObj.shirtSize || metadataObj.complementaryData?.shirtSize || null;
+          const pdfBuffer = await renderReceiptPdf({
+            receiptCode,
+            eventName: event.title,
+            eventDate: event.date,
+            eventLocation: event.location,
+            athleteName: registration.user.name || 'Participante',
+            athleteCpf: registration.user.cpf || metadataObj.cpf || '',
+            athleteBirthDate: registration.athleteBirthDate,
+            athleteGender: registration.athleteGender,
+            categoryName: category.name,
+            batchName: batch.name,
+            shirtSize: event.hasKit ? rawShirtSize : null,
+            amountPaid: 0,
+            verificationUrl: `https://syncflow.com/verificar/${receiptCode}`,
+            issuedAt: new Date(),
+          });
+          attachments = [
+            {
+              filename: `comprovante-${receiptCode}.pdf`,
+              content: pdfBuffer.toString('base64'),
+            },
+          ];
+        } catch (pdfErr) {
+          console.error(`[RegistrationProcessor] Falha ao gerar PDF de comprovante:`, pdfErr);
+        }
+
+        // Enfileira confirmação por e-mail sem passar por gateway de pagamento
+        const emailQueue = getQueue(QueueName.EMAIL);
+        const emailJobData: EmailJobData = {
+          to: registration.user.email,
+          subject: `Inscrição Confirmada — ${event.title}`,
+          templateId: 'REGISTRATION_CONFIRMED',
+          tenantId,
+          variables: {
+            userName: registration.user.name || 'Participante',
+            athleteName: registration.user.name || 'Participante',
+            eventName: event.title,
+            eventTitle: event.title,
+            receiptCode,
+            isFree: 'true',
+          },
+          attachments,
+        };
+
+        await emailQueue.add('send-email', emailJobData);
+        return;
+      }
+
+      // 3.3 Fluxo Pago -> PENDING e enfileiramento na payment-queue
       await tx.registration.update({
         where: { id: registrationId },
         data: {
           status: 'PENDING',
-          amountPaid: totalAmount,
+          amountPaid: orderCalc.total,
           couponId,
+          receiptCode,
           metadata: updatedMetadata,
         },
       });
 
-      // 4. Enfileira o job de pagamento na fila payment-queue
       const paymentQueue = getQueue(QueueName.PAYMENT);
       const method: 'PIX' | 'CREDIT_CARD' = metadataObj.paymentMethod === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX';
 
@@ -144,7 +232,7 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
         orderId: registrationId,
         userId,
         tenantId,
-        amount: totalAmount,
+        amount: orderCalc.total,
         method,
         customerEmail: registration.user.email,
         customerName: registration.user.name || 'Participante',
@@ -173,7 +261,7 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
       await paymentQueue.add('process-payment', paymentJobData);
 
     } else {
-      // 3.2 Vagas Esgotadas -> Reprovado
+      // 3.4 Vagas Esgotadas ou Lote Encerrado/Não Aberto -> Reprovado
       await tx.registration.update({
         where: { id: registrationId },
         data: {
@@ -181,20 +269,44 @@ export async function processRegistration(job: Job<RegistrationJobData>): Promis
         },
       });
 
-      // Enfileira job de e-mail notificando o esgotamento
       const emailQueue = getQueue(QueueName.EMAIL);
-      const emailJobData: EmailJobData = {
-        to: registration.user.email,
-        subject: 'Inscrição Não Concluída - Vagas Esgotadas',
-        templateId: 'REGISTRATION_REJECTED_OUT_OF_SLOTS',
-        tenantId,
-        variables: {
-          userName: registration.user.name || 'Participante',
-          eventName: event.title,
-        },
-      };
 
-      await emailQueue.add('send-email', emailJobData);
+      if (isEventNotStarted || isBatchNotStarted) {
+        await emailQueue.add('send-email', {
+          to: registration.user.email,
+          subject: 'Inscrição Não Concluída - Lote Ainda Não Aberto',
+          templateId: 'REGISTRATION_BATCH_NOT_STARTED',
+          tenantId,
+          variables: {
+            userName: registration.user.name || 'Participante',
+            eventName: event.title,
+            batchName: batch.name,
+          },
+        });
+      } else if (isBatchDateExpired || isBatchSoldOut) {
+        await emailQueue.add('send-email', {
+          to: registration.user.email,
+          subject: 'Inscrição Não Concluída - Lote Encerrado',
+          templateId: 'REGISTRATION_BATCH_CLOSED',
+          tenantId,
+          variables: {
+            userName: registration.user.name || 'Participante',
+            eventName: event.title,
+            batchName: batch.name,
+          },
+        });
+      } else {
+        await emailQueue.add('send-email', {
+          to: registration.user.email,
+          subject: 'Inscrição Não Concluída - Vagas Esgotadas',
+          templateId: 'REGISTRATION_REJECTED_OUT_OF_SLOTS',
+          tenantId,
+          variables: {
+            userName: registration.user.name || 'Participante',
+            eventName: event.title,
+          },
+        });
+      }
     }
   });
 }

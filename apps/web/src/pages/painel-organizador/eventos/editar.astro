@@ -36,7 +36,11 @@ if (!eventId) {
 const event = await prisma.event.findUnique({
   where: { id: eventId },
   include: {
-    categories: true,
+    categories: {
+      include: {
+        batches: true,
+      },
+    },
     batches: true,
   },
 });
@@ -60,24 +64,36 @@ if (!isAdmin && event.status !== 'DRAFT' && event.status !== 'REJECTED') {
   return Astro.redirect('/painel-organizador');
 }
 
-// Serializar Prisma Decimals para string
+// Serializar Prisma Decimals e Datas para string
 const serializedEvent = {
   ...event,
+  adminFeeRate: event.adminFeeRate ? event.adminFeeRate.toString() : null,
+  registrationOpensAt: event.registrationOpensAt ? event.registrationOpensAt.toISOString() : null,
+  hasKit: event.hasKit,
+  kitSizes: event.kitSizes,
   categories: event.categories.map((cat: any) => ({
     ...cat,
-    price: cat.price ? cat.price.toString() : '0'
+    price: cat.price ? cat.price.toString() : '0',
+    batches: (cat.batches || []).map((b: any) => ({
+      ...b,
+      price: b.price ? b.price.toString() : '0',
+      startDate: b.startDate ? b.startDate.toISOString() : null,
+      endDate: b.endDate ? b.endDate.toISOString() : null,
+    })),
   })),
   batches: event.batches.map((bat: any) => ({
     ...bat,
-    price: bat.price ? bat.price.toString() : '0'
-  }))
+    price: bat.price ? bat.price.toString() : '0',
+    startDate: bat.startDate ? bat.startDate.toISOString() : null,
+    endDate: bat.endDate ? bat.endDate.toISOString() : null,
+  })),
 };
 ---
 
 <BaseLayout title={`Editar Evento — ${event.title}`}>
   <!-- Cabeçalho HUD Simplificado -->
   <section class="bg-surface border-b border-ink-muted/20 py-8 px-6">
-    <div class="max-w-4xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
+    <div class="max-w-6xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
       <a href={isAdmin ? "/admin/dashboard" : "/painel-organizador"} class="hover:text-accent transition-colors uppercase flex items-center gap-1.5 mb-2">
         &larr; Voltar para {isAdmin ? "o Painel Geral Admin" : "o Dashboard"}
       </a>
@@ -91,7 +107,7 @@ const serializedEvent = {
     </div>
   </section>
 
-  <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full">
+  <section class="max-w-6xl mx-auto px-6 py-12 flex-grow w-full">
     <EditEventForm client:load event={serializedEvent} isAdmin={isAdmin} />
   </section>
 </BaseLayout>

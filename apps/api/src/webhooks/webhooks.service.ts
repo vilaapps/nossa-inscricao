@@ -11,7 +11,10 @@ export class WebhooksService {
   ) {}
 
   // Recebe e enfileira o webhook bruto para processamento assíncrono e resiliente
-  async handleAsaasWebhook(body: any, signature: string): Promise<{ success: boolean }> {
+  async handleAsaasWebhook(
+    body: any,
+    signature: string,
+  ): Promise<{ success: boolean }> {
     const jobData: WebhookJobData = {
       provider: 'asaas',
       event: body.event,

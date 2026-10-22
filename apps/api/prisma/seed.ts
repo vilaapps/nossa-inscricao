@@ -22,6 +22,7 @@ async function main() {
     data: {
       id: 'tenant-1',
       name: 'Corrida Brasil Organizações',
+      commissionRate: 10.00,
     },
   });
   console.log(`🏢 Tenant criado: ${tenant.name} (${tenant.id})`);
@@ -29,7 +30,7 @@ async function main() {
   // 3. Criar Usuário Administrador (Organizador) correspondente ao mock Clerk
   const adminUser = await prisma.user.create({
     data: {
-      id: 'user_2m1nE9nC3K0t5p1Q2vR3W4xY5zZ', // ID mockado do Clerk para o Admin
+      id: 'user_2m1nE9nC3K0t5p1Q2vR3W4xY5zZ',
       email: 'organizador@corrida.com.br',
       name: 'Carlos Organizador',
       role: 'ORGANIZER',
@@ -51,7 +52,7 @@ async function main() {
 
   // 4. Criar Eventos
 
-  // Evento 1: Meia Maratona do Rio
+  // Evento 1: Meia Maratona do Rio (Com Kit Oficial, Taxa padrão do Tenant 10%, lotes por categoria)
   const event1 = await prisma.event.create({
     data: {
       id: 'evt_meia_rio',
@@ -60,6 +61,10 @@ async function main() {
       description: 'A corrida mais charmosa do Rio de Janeiro. Percorra a orla de Copacabana e Ipanema sob o sol matutino com suporte de hidratação premium de 2 em 2 quilômetros, medalha de finisher em metal pesado e kit com camiseta tecnológica de alta absorção.',
       slug: 'meia-maratona-copacabana-2026',
       date: new Date('2026-10-18T07:00:00Z'),
+      registrationOpensAt: new Date('2026-01-01T00:00:00Z'),
+      hasKit: true,
+      kitSizes: ['P', 'M', 'G', 'GG'],
+      adminFeeRate: null, // Usa o padrão do tenant (10%)
       status: 'PUBLISHED',
       availableSlots: 1500,
     },
@@ -68,74 +73,116 @@ async function main() {
   // Categorias do Evento 1
   const cat1_5k = await prisma.category.create({
     data: {
+      id: 'cat_meia_rio_5k',
       eventId: event1.id,
       tenantId: tenant.id,
       name: 'Corrida 5K - Geral',
       gender: 'MISTO',
-      price: 0,
+      minAge: 16,
+      maxAge: 99,
+      price: 99.90,
+      totalSlots: 400,
       availableSlots: 400,
     },
   });
 
   const cat1_10k = await prisma.category.create({
     data: {
+      id: 'cat_meia_rio_10k',
       eventId: event1.id,
       tenantId: tenant.id,
       name: 'Corrida 10K - Geral',
       gender: 'MISTO',
-      price: 0,
+      minAge: 18,
+      maxAge: 99,
+      price: 119.90,
+      totalSlots: 500,
       availableSlots: 500,
     },
   });
 
   const cat1_21k = await prisma.category.create({
     data: {
+      id: 'cat_meia_rio_21k',
       eventId: event1.id,
       tenantId: tenant.id,
       name: 'Meia Maratona 21K - Elite/Geral',
       gender: 'MISTO',
-      price: 0,
+      minAge: 18,
+      maxAge: 99,
+      price: 149.90,
+      totalSlots: 600,
       availableSlots: 600,
     },
   });
 
-  // Lotes do Evento 1
+  // Lotes vinculados diretamente à Categoria 10K (Exemplo de 3 lotes mistos: DATE -> QUANTITY -> DATE)
   await prisma.batch.create({
     data: {
+      id: 'batch_rio_10k_l1',
       eventId: event1.id,
+      categoryId: cat1_10k.id,
       tenantId: tenant.id,
-      name: 'Lote Promocional (Esgotado)',
-      price: 69.90,
-      maxQuantity: 150,
-      soldQuantity: 150,
-      active: false,
+      name: '1º Lote (Abertura por Data)',
+      price: 99.90,
+      type: 'DATE',
+      position: 1,
+      startDate: new Date('2026-01-01T00:00:00Z'),
+      endDate: new Date('2026-06-30T23:59:59Z'),
+      maxQuantity: 200,
+      soldQuantity: 200, // Fechado/esgotado
+      active: true,
     },
   });
 
   const batch1_active = await prisma.batch.create({
     data: {
-      id: 'batch_rio_1',
+      id: 'batch_rio_10k_l2',
       eventId: event1.id,
+      categoryId: cat1_10k.id,
       tenantId: tenant.id,
-      name: '1º Lote Oficial',
-      price: 99.90,
-      maxQuantity: 800,
-      soldQuantity: 124,
+      name: '2º Lote (Por Quantidade - Ativo)',
+      price: 119.90,
+      type: 'QUANTITY',
+      position: 2,
+      maxQuantity: 150,
+      soldQuantity: 42,
       active: true,
-      startDate: new Date('2026-01-01T00:00:00Z'),
-      endDate: new Date('2026-08-31T23:59:59Z'),
     },
   });
 
   await prisma.batch.create({
     data: {
+      id: 'batch_rio_10k_l3',
       eventId: event1.id,
+      categoryId: cat1_10k.id,
       tenantId: tenant.id,
-      name: '2º Lote Oficial',
+      name: '3º Lote Final (Por Data)',
       price: 139.90,
-      maxQuantity: 550,
+      type: 'DATE',
+      position: 3,
+      startDate: new Date('2026-07-01T00:00:00Z'),
+      endDate: new Date('2026-10-10T23:59:59Z'),
+      maxQuantity: 150,
       soldQuantity: 0,
-      active: false,
+      active: true,
+    },
+  });
+
+  // Lotes para Categoria 5K
+  await prisma.batch.create({
+    data: {
+      id: 'batch_rio_5k_l1',
+      eventId: event1.id,
+      categoryId: cat1_5k.id,
+      tenantId: tenant.id,
+      name: 'Lote Único 5K',
+      price: 89.90,
+      type: 'QUANTITY',
+      position: 1,
+      maxQuantity: 400,
+      soldQuantity: 80,
+      active: true,
     },
   });
 
@@ -153,165 +200,122 @@ async function main() {
     },
   });
 
-  console.log(`🏃 Evento 1 criado: ${event1.title} com 3 categorias e 3 lotes.`);
-
-  // Evento 2: GP Ultra Trail
-  const event2 = await prisma.event.create({
-    data: {
-      id: 'evt_trail_serra',
-      tenantId: tenant.id,
-      title: 'GP ULTRA TRAIL SERRA DA MANTIQUEIRA 2026',
-      description: 'Desafie seus limites nas montanhas mais íngremes da Serra da Mantiqueira. Uma corrida de trilha pura, com altimetria acumulada desafiadora de mais de 2500m nas distâncias principais, travessia de riachos e paisagens deslumbrantes.',
-      slug: 'gp-ultra-trail-mantiqueira-2026',
-      date: new Date('2026-08-15T06:00:00Z'),
-      status: 'PUBLISHED',
-      availableSlots: 600,
-    },
-  });
-
-  // Categorias do Evento 2
-  await prisma.category.create({
-    data: {
-      eventId: event2.id,
-      tenantId: tenant.id,
-      name: 'Short Trail 12K - Misto',
-      gender: 'MISTO',
-      price: 0,
-      availableSlots: 200,
-    },
-  });
-
-  await prisma.category.create({
-    data: {
-      eventId: event2.id,
-      tenantId: tenant.id,
-      name: 'Medium Trail 25K - Geral',
-      gender: 'MISTO',
-      price: 0,
-      availableSlots: 200,
-    },
-  });
-
-  await prisma.category.create({
-    data: {
-      eventId: event2.id,
-      tenantId: tenant.id,
-      name: 'Ultra Trail 50K - Elite/Geral',
-      gender: 'MISTO',
-      price: 0,
-      availableSlots: 200,
-    },
-  });
-
-  // Lotes do Evento 2
-  const batch2_active = await prisma.batch.create({
-    data: {
-      id: 'batch_trail_1',
-      eventId: event2.id,
-      tenantId: tenant.id,
-      name: 'Lote Único Geral',
-      price: 159.00,
-      maxQuantity: 600,
-      soldQuantity: 412,
-      active: true,
-    },
-  });
-
-  // Cupom do Evento 2
+  // Cupom 100% OFF (Gratuidade)
   await prisma.coupon.create({
     data: {
+      eventId: event1.id,
+      tenantId: tenant.id,
+      code: 'GRATIS100',
+      discountType: 'PERCENTAGE',
+      discountValue: 100.00,
+      maxUses: 50,
+      usedCount: 1,
+      active: true,
+    },
+  });
+
+  console.log(`🏃 Evento 1 criado: ${event1.title} com kit e lotes por categoria.`);
+
+  // Evento 2: Treinão Social Gratuito (Sem Kit, Gratuito, Taxa 0%)
+  const event2 = await prisma.event.create({
+    data: {
+      id: 'evt_treinao_social',
+      tenantId: tenant.id,
+      title: 'TREINÃO SOCIAL DA COMUNIDADE 2026',
+      description: 'Evento 100% gratuito e comunitário aberto para todos os atletas e entusiastas da corrida.',
+      slug: 'treinao-social-comunidade-2026',
+      date: new Date('2026-09-20T08:00:00Z'),
+      registrationOpensAt: new Date('2026-02-01T00:00:00Z'),
+      hasKit: false,
+      kitSizes: [],
+      adminFeeRate: 0, // Isenção de taxa
+      status: 'PUBLISHED',
+      availableSlots: 300,
+    },
+  });
+
+  const cat2_geral = await prisma.category.create({
+    data: {
+      id: 'cat_treinao_geral',
       eventId: event2.id,
       tenantId: tenant.id,
-      code: 'TRAIL20',
-      discountType: 'PERCENTAGE',
-      discountValue: 20.00,
-      maxUses: 100,
-      usedCount: 45,
-      active: true,
-    },
-  });
-
-  console.log(`⛰️ Evento 2 criado: ${event2.title} com 3 categorias e 1 lote.`);
-
-  // Evento 3: Desafio Ciclismo
-  const event3 = await prisma.event.create({
-    data: {
-      id: 'evt_ciclismo_anjos',
-      tenantId: tenant.id,
-      title: 'DESAFIO DOS ANJOS DE CICLISMO DE ESTRADA',
-      description: 'Uma prova clássica para ciclistas de estrada. Um circuito de 80km de pura adrenalina com asfalto perfeito, pelotões organizados e cronometragem eletrônica ativa por transponder. Subidas desafiadoras que testarão seu sprint final.',
-      slug: 'desafio-anjos-ciclismo-2026',
-      date: new Date('2026-11-22T08:00:00Z'),
-      status: 'PUBLISHED',
-      availableSlots: 400,
-    },
-  });
-
-  // Categorias do Evento 3
-  await prisma.category.create({
-    data: {
-      eventId: event3.id,
-      tenantId: tenant.id,
-      name: 'Ciclismo Speed - Masculino Pro',
-      gender: 'MASCULINO',
-      price: 0,
-      availableSlots: 100,
-    },
-  });
-
-  await prisma.category.create({
-    data: {
-      eventId: event3.id,
-      tenantId: tenant.id,
-      name: 'Ciclismo Speed - Feminino Pro',
-      gender: 'FEMININO',
-      price: 0,
-      availableSlots: 100,
-    },
-  });
-
-  await prisma.category.create({
-    data: {
-      eventId: event3.id,
-      tenantId: tenant.id,
-      name: 'Ciclismo Speed - Geral Amador',
+      name: 'Caminhada & Corrida 3K - Livre',
       gender: 'MISTO',
       price: 0,
-      availableSlots: 200,
-    },
-  });
-
-  // Lotes do Evento 3
-  const batch3_active = await prisma.batch.create({
-    data: {
-      id: 'batch_ciclismo_1',
-      eventId: event3.id,
-      tenantId: tenant.id,
-      name: 'Lote Promocional Ciclismo',
-      price: 180.00,
-      maxQuantity: 200,
-      soldQuantity: 198, // Quase esgotado!
-      active: true,
+      totalSlots: 300,
+      availableSlots: 280,
     },
   });
 
   await prisma.batch.create({
     data: {
-      eventId: event3.id,
+      id: 'batch_treinao_free',
+      eventId: event2.id,
+      categoryId: cat2_geral.id,
       tenantId: tenant.id,
-      name: 'Lote Regular Ciclismo',
-      price: 240.00,
-      maxQuantity: 200,
-      soldQuantity: 0,
-      active: false,
+      name: 'Inscrição Gratuita',
+      price: 0,
+      type: 'QUANTITY',
+      position: 1,
+      maxQuantity: 300,
+      soldQuantity: 20,
+      active: true,
     },
   });
 
-  console.log(`🚴 Evento 3 criado: ${event3.title} com 3 categorias e 2 lotes.`);
+  console.log(`🎉 Evento 2 criado: ${event2.title} (Gratuito, sem kit, taxa 0%).`);
 
-  // 5. Adicionar algumas inscricoes ficticias do participante usr_test_123 para popular o painel dele
-  
-  // Inscrição 1: Copacabana 2026 (Confirmada e paga)
+  // Evento 3: Desafio Ciclismo com Taxa Personalizada (0% de taxa por evento promocional)
+  const event3 = await prisma.event.create({
+    data: {
+      id: 'evt_ciclismo_zero_taxa',
+      tenantId: tenant.id,
+      title: 'DESAFIO DE CICLISMO SEM TAXA 2026',
+      description: 'Prova com taxa administrativa subsidiada pelo organizador (0% de taxa).',
+      slug: 'desafio-ciclismo-zero-taxa-2026',
+      date: new Date('2026-11-22T08:00:00Z'),
+      registrationOpensAt: new Date('2026-03-01T00:00:00Z'),
+      hasKit: true,
+      kitSizes: ['P', 'M', 'G'],
+      adminFeeRate: 0, // Override de 0%
+      status: 'PUBLISHED',
+      availableSlots: 200,
+    },
+  });
+
+  const cat3_speed = await prisma.category.create({
+    data: {
+      id: 'cat_ciclismo_speed',
+      eventId: event3.id,
+      tenantId: tenant.id,
+      name: 'Speed Pro 60K',
+      gender: 'MISTO',
+      minAge: 18,
+      price: 150.00,
+      totalSlots: 200,
+      availableSlots: 195,
+    },
+  });
+
+  await prisma.batch.create({
+    data: {
+      id: 'batch_ciclismo_lote1',
+      eventId: event3.id,
+      categoryId: cat3_speed.id,
+      tenantId: tenant.id,
+      name: 'Lote Promocional',
+      price: 150.00,
+      type: 'QUANTITY',
+      position: 1,
+      maxQuantity: 200,
+      soldQuantity: 5,
+      active: true,
+    },
+  });
+
+  console.log(`🚴 Evento 3 criado: ${event3.title} com taxa 0%.`);
+
+  // 5. Inscrições fictícias para testes com comprovante
   const reg1 = await prisma.registration.create({
     data: {
       id: 'reg_ficticia_1',
@@ -322,8 +326,11 @@ async function main() {
       userId: participantUser.id,
       status: 'CONFIRMED',
       paymentStatus: 'PAID',
-      amountPaid: 99.90,
-      metadata: { size: 'G', healthAgreement: true } as any,
+      amountPaid: 131.89, // 119.90 + 10%
+      athleteBirthDate: new Date('1990-05-15'),
+      athleteGender: 'MASCULINO',
+      receiptCode: 'SF-RIO-908123',
+      metadata: { shirtSize: 'G', healthAgreement: true } as any,
     },
   });
 
@@ -331,7 +338,7 @@ async function main() {
     data: {
       registrationId: reg1.id,
       tenantId: tenant.id,
-      amount: 99.90,
+      amount: 131.89,
       status: 'PAID',
       method: 'PIX',
       pixQrCode: '00020101021226830014br.gov.bcb.pix2561api.asaas.com/v2/pix/qr/pay/mock_pay_1',
@@ -339,36 +346,7 @@ async function main() {
     },
   });
 
-  // Inscrição 2: GP Trail (Pendente de pagamento)
-  const reg2 = await prisma.registration.create({
-    data: {
-      id: 'reg_ficticia_2',
-      tenantId: tenant.id,
-      eventId: event2.id,
-      categoryId: (await prisma.category.findFirst({ where: { eventId: event2.id } }))!.id,
-      batchId: batch2_active.id,
-      userId: participantUser.id,
-      status: 'PENDING',
-      paymentStatus: 'PENDING',
-      amountPaid: 159.00,
-      metadata: { size: 'M', healthAgreement: true } as any,
-    },
-  });
-
-  await prisma.payment.create({
-    data: {
-      registrationId: reg2.id,
-      tenantId: tenant.id,
-      amount: 159.00,
-      status: 'PENDING',
-      method: 'PIX',
-      pixQrCode: '00020101021226830014br.gov.bcb.pix2561api.asaas.com/v2/pix/qr/pay/mock_pay_trail_2',
-      gatewayPaymentId: 'pay_mock_asaas_456',
-      pixExpiration: new Date(Date.now() + 24 * 60 * 60 * 1000), // expira em 24h
-    },
-  });
-
-  console.log('📝 Inscrições e pagamentos fictícios criados para o participante de testes.');
+  console.log('📝 Inscrição de teste com receiptCode criada.');
   console.log('🏁 Seed concluído com 100% de sucesso!');
 }
 

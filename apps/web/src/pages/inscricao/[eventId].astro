@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { PrismaClient } from '@prisma/client';
+import { effectiveFeeRate, getCategoryBatchStatus } from '@syncflow/shared';
 import RegistrationForm from '../../components/react/RegistrationForm';
 
 const { eventId } = Astro.params;
@@ -11,14 +12,22 @@ if (!eventId) {
 
 const prisma = new PrismaClient();
 
-// Buscar o evento com as categorias, lotes ativos e tenant
+// Buscar o evento com as categorias, lotes e tenant
 const event = await prisma.event.findFirst({
   where: { id: eventId, status: 'PUBLISHED' },
   include: {
     tenant: true,
-    categories: true,
+    categories: {
+      include: {
+        batches: {
+          where: { active: true },
+          orderBy: { position: 'asc' },
+        },
+      },
+    },
     batches: {
       where: { active: true },
+      orderBy: { position: 'asc' },
     },
   },
 });
@@ -29,23 +38,70 @@ if (!event) {
   return Astro.redirect('/404');
 }
 
-// Taxa administrativa do parceiro (padrão 10%)
-const commissionRate = Number(event.tenant?.commissionRate || 10);
+const now = new Date();
+
+// Bloqueios contra-fluxo em nível de rota:
+// 1. Inscrições ainda não abriram
+if (event.registrationOpensAt && now < new Date(event.registrationOpensAt)) {
+  return Astro.redirect(`/eventos/${event.slug}`);
+}
+
+// 2. Evento já realizado ou sem vagas gerais
+if (now > new Date(event.date) || event.availableSlots <= 0) {
+  return Astro.redirect(`/eventos/${event.slug}`);
+}
+
+// 3. Ao menos uma categoria com lote ativo e vagas disponíveis
+const hasAnyOpenCategory = event.categories.some((cat) => {
+  const catBatches = cat.batches && cat.batches.length > 0 ? cat.batches : event.batches;
+  const status = getCategoryBatchStatus(catBatches as any, event.registrationOpensAt, now);
+  return status.status === 'OPEN' && cat.availableSlots > 0;
+});
+
+if (!hasAnyOpenCategory) {
+  return Astro.redirect(`/eventos/${event.slug}`);
+}
+
+// Taxa administrativa efetiva (respeita override do evento, inclusive 0%)
+const commissionRate = effectiveFeeRate(event, event.tenant);
 
 // Serializar explicitamente categorias e lotes para garantir integridade na fronteira Astro/React
-const serializedCategories = event.categories.map(cat => ({
+const serializedCategories = event.categories.map((cat) => ({
   id: cat.id,
   name: cat.name,
   gender: cat.gender,
+  minAge: cat.minAge,
+  maxAge: cat.maxAge,
+  totalSlots: cat.totalSlots,
   availableSlots: cat.availableSlots,
+  batches: (cat.batches && cat.batches.length > 0 ? cat.batches : event.batches).map((b) => ({
+    id: b.id,
+    name: b.name,
+    type: b.type,
+    position: b.position,
+    price: b.price.toString(),
+    active: b.active,
+    startDate: b.startDate?.toISOString() || null,
+    endDate: b.endDate?.toISOString() || null,
+    maxQuantity: b.maxQuantity,
+    soldQuantity: b.soldQuantity,
+  })),
 }));
 
-const serializedBatches = event.batches.map(batch => ({
+const serializedBatches = event.batches.map((batch) => ({
   id: batch.id,
   name: batch.name,
+  type: batch.type,
+  position: batch.position,
   price: batch.price.toString(),
   active: batch.active,
+  startDate: batch.startDate?.toISOString() || null,
+  endDate: batch.endDate?.toISOString() || null,
+  maxQuantity: batch.maxQuantity,
+  soldQuantity: batch.soldQuantity,
 }));
+
+const apiUrl = process.env.PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3001';
 ---
 
 <BaseLayout title={`Inscrição — ${event.title}`}>
@@ -67,8 +123,13 @@ const serializedBatches = event.batches.map(batch => ({
   <section class="max-w-4xl mx-auto px-6 py-12 flex-grow w-full">
     <RegistrationForm
       client:load
+      apiUrl={apiUrl}
       eventId={event.id}
       eventTitle={event.title}
+      eventDate={event.date.toISOString()}
+      registrationOpensAt={event.registrationOpensAt?.toISOString() || null}
+      hasKit={event.hasKit}
+      kitSizes={event.kitSizes}
       categories={serializedCategories}
       batches={serializedBatches}
       commissionRate={commissionRate}

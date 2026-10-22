@@ -28,7 +28,7 @@ describe('ValueObject Base Class', () => {
 
     // Act
     const comparedToNull = vo.equals(null as any);
-    const comparedToUndefined = vo.equals(undefined as any);
+    const comparedToUndefined = vo.equals(undefined);
 
     // Assert
     expect(comparedToNull).toBe(false);

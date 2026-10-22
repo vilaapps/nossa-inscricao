@@ -185,7 +185,7 @@ describe('Email Processor', () => {
     vi.mocked(ResendService).mockImplementationOnce(() => {
       return {
         sendEmail: mockSendEmail,
-      };
+      } as any;
     });
 
     // Act & Assert
@@ -217,5 +217,61 @@ describe('Email Processor', () => {
       expect(html).toContain('Participante');
       expect(html).toContain('Evento');
     });
+
+    it('should test buildHtmlTemplate for REGISTRATION_BATCH_CLOSED', () => {
+      const html = buildHtmlTemplate('REGISTRATION_BATCH_CLOSED', 'Lote Encerrado', {
+        userName: 'Carlos',
+        eventName: 'Corrida 10K',
+      });
+      expect(html).toContain('Lote de Inscrição Encerrado');
+      expect(html).toContain('Carlos');
+      expect(html).toContain('Corrida 10K');
+    });
+
+    it('should test buildHtmlTemplate fallbacks for REGISTRATION_BATCH_CLOSED', () => {
+      const html = buildHtmlTemplate('REGISTRATION_BATCH_CLOSED', 'Lote Encerrado', {});
+      expect(html).toContain('Participante');
+      expect(html).toContain('Evento');
+    });
+
+    it('should customize message for free event in REGISTRATION_CONFIRMED', () => {
+      const html = buildHtmlTemplate('REGISTRATION_CONFIRMED', 'Confirmado', {
+        userName: 'Maria',
+        eventName: 'Corrida Gratuita',
+        isFree: 'true',
+      });
+      expect(html).toContain('está oficialmente <strong>CONFIRMADA</strong>!');
+      expect(html).not.toContain('Seu pagamento foi confirmado');
+    });
+  });
+
+  it('should pass attachments to resendService when provided in job data', async () => {
+    // Arrange
+    const attachments = [{ filename: 'comprovante.pdf', content: 'base64-pdf' }];
+    const job = createMockJob({
+      to: 'buyer@test.com',
+      subject: 'Inscrição Confirmada!',
+      templateId: 'REGISTRATION_CONFIRMED',
+      tenantId: 'ten_1',
+      variables: {
+        userName: 'Astro Attendee',
+        eventName: 'React Conf 2026',
+      },
+      attachments,
+    });
+
+    // Act
+    await processEmail(job);
+
+    // Assert
+    const resendInstance = vi.mocked(ResendService).mock.results[0].value;
+    expect(resendInstance.sendEmail).toHaveBeenCalledWith(
+      'buyer@test.com',
+      'Inscrição Confirmada!',
+      expect.stringContaining('React Conf 2026'),
+      undefined,
+      undefined,
+      attachments,
+    );
   });
 });

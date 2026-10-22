@@ -258,7 +258,7 @@ describe('Payment Processor', () => {
     vi.mocked(asaasService.createPayment).mockResolvedValueOnce({ id: 'pay_asaas_123' });
     vi.mocked(asaasService.getPixQrCode).mockResolvedValueOnce({
       payload: 'pix-payload-without-exp',
-      expirationDate: null,
+      expirationDate: null as any,
     });
 
     // Act

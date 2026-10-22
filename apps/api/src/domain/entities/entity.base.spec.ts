@@ -42,7 +42,7 @@ describe('Entity Base Class', () => {
 
     // Act
     const comparedToNull = entity.equals(null as any);
-    const comparedToUndefined = entity.equals(undefined as any);
+    const comparedToUndefined = entity.equals(undefined);
 
     // Assert
     expect(comparedToNull).toBe(false);

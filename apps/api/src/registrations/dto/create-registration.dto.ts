@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsObject,
+  IsISO8601,
+  IsIn,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateRegistrationDto {
@@ -12,22 +19,52 @@ export class CreateRegistrationDto {
   @IsNotEmpty()
   categoryId: string;
 
-  @ApiProperty({ description: 'ID do Lote de Inscrição' })
+  @ApiPropertyOptional({
+    description: 'ID do Lote de Inscrição (opcional, resolvido pelo servidor)',
+  })
   @IsString()
+  @IsOptional()
+  batchId?: string;
+
+  @ApiProperty({
+    description: 'Data de nascimento do atleta no formato ISO 8601',
+  })
+  @IsISO8601()
   @IsNotEmpty()
-  batchId: string;
+  athleteBirthDate: string;
+
+  @ApiProperty({
+    description: 'Gênero do atleta para conferência de categoria',
+    enum: ['MASCULINO', 'FEMININO'],
+  })
+  @IsIn(['MASCULINO', 'FEMININO'])
+  @IsNotEmpty()
+  athleteGender: 'MASCULINO' | 'FEMININO';
+
+  @ApiPropertyOptional({
+    description:
+      'Tamanho da camiseta/kit (obrigatório se o evento possui kit, proibido se não possui)',
+  })
+  @IsString()
+  @IsOptional()
+  shirtSize?: string;
 
   @ApiPropertyOptional({ description: 'Código do Cupom de Desconto' })
   @IsString()
   @IsOptional()
   couponCode?: string;
 
-  @ApiPropertyOptional({ description: 'Dados complementares do formulário customizado do evento' })
+  @ApiPropertyOptional({
+    description: 'Dados complementares do formulário customizado do evento',
+  })
   @IsObject()
   @IsOptional()
   complementaryData?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Método de pagamento selecionado', enum: ['PIX', 'CREDIT_CARD'] })
+  @ApiPropertyOptional({
+    description: 'Método de pagamento selecionado',
+    enum: ['PIX', 'CREDIT_CARD'],
+  })
   @IsString()
   @IsOptional()
   paymentMethod?: 'PIX' | 'CREDIT_CARD';

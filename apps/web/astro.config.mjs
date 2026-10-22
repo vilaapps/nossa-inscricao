@@ -21,6 +21,11 @@ export default defineConfig({
   ],
   vite: {
     envDir: '../../',
+    define: {
+      'import.meta.env.PUBLIC_API_URL': JSON.stringify(
+        process.env.PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3001'
+      ),
+    },
     plugins: [tailwindcss()],
     resolve: {
       alias: {

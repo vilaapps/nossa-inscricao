@@ -150,7 +150,11 @@ describe('Webhook Processor', () => {
 
     expect(updateRegSpy).toHaveBeenCalledWith({
       where: { id: 'reg_1' },
-      data: { status: 'CONFIRMED', paymentStatus: 'PAID' },
+      data: {
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        receiptCode: expect.any(String),
+      },
     });
 
     expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', {
@@ -162,7 +166,234 @@ describe('Webhook Processor', () => {
         userName: 'Participante',
         eventName: 'Maratona Astro',
       },
+      attachments: expect.any(Array),
     });
+  });
+
+  // deve confirmar pagamento e enfileirar e-mail mesmo se a geracao de PDF falhar
+  it('should confirm payment and enqueue email without attachment if renderReceiptPdf fails', async () => {
+    // Arrange
+    const job = createMockJob({
+      provider: 'asaas',
+      event: 'PAYMENT_RECEIVED',
+      payload: { payment: { id: 'pay_asaas_pdf_fail' } },
+    });
+
+    const mockPayment = {
+      id: 'pay_pdf_fail',
+      registrationId: 'reg_pdf_fail',
+      tenantId: 'ten_1',
+      status: 'PENDING',
+      registration: {
+        id: 'reg_pdf_fail',
+        eventId: 'evt_1',
+        receiptCode: 'REC-EXISTING-1',
+        user: { email: 'participant2@test.com', name: 'Atleta Teste' },
+        event: { title: 'Corrida das Montanhas' },
+      },
+    };
+
+    vi.mocked(prisma.payment.findUnique).mockResolvedValueOnce(mockPayment as any);
+
+    const updatePaymentSpy = vi.fn();
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        payment: { update: updatePaymentSpy },
+        registration: { update: updateRegSpy },
+      };
+      return callback(tx as any);
+    });
+
+    // Simula falha no renderReceiptPdf espionando console.error
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Forçamos o renderReceiptPdf a falhar passando um mockPayment sem os campos necessários ou forçando erro
+    // Na verdade, podemos usar um mock em @syncflow/shared se importado, ou passar dados que causem erro no renderReceiptPdf
+    // Ou mockar temporariamente renderReceiptPdf
+    const sharedModule = await import('@syncflow/shared');
+    const renderSpy = vi.spyOn(sharedModule, 'renderReceiptPdf').mockRejectedValueOnce(new Error('PDF Kit crashed'));
+
+    // Act
+    await processWebhook(job);
+
+    // Assert
+    expect(updatePaymentSpy).toHaveBeenCalledWith({
+      where: { id: 'pay_pdf_fail' },
+      data: { status: 'PAID' },
+    });
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_pdf_fail' },
+      data: {
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        receiptCode: 'REC-EXISTING-1',
+      },
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', {
+      to: 'participant2@test.com',
+      subject: 'Inscrição Confirmada!',
+      templateId: 'REGISTRATION_CONFIRMED',
+      tenantId: 'ten_1',
+      variables: {
+        userName: 'Atleta Teste',
+        eventName: 'Corrida das Montanhas',
+      },
+      attachments: undefined,
+    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[WebhookProcessor] Falha ao gerar PDF de comprovante:'),
+      expect.any(Error)
+    );
+
+    renderSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  // deve confirmar pagamento com kit, categoria, lote e metadados completos
+  it('should confirm payment with kit, category, batch and complete athlete info', async () => {
+    // Arrange
+    const job = createMockJob({
+      provider: 'asaas',
+      event: 'PAYMENT_RECEIVED',
+      payload: { payment: { id: 'pay_asaas_full' } },
+    });
+
+    const mockPayment = {
+      id: 'pay_full',
+      registrationId: 'reg_full',
+      tenantId: 'ten_1',
+      status: 'PENDING',
+      amount: 150.00,
+      registration: {
+        id: 'reg_full',
+        eventId: 'evt_1',
+        athleteBirthDate: new Date('1990-05-15'),
+        athleteGender: 'M',
+        metadata: { shirtSize: 'GG' },
+        user: { email: 'full@test.com', name: 'Atleta Full', cpf: '11122233344' },
+        event: {
+          title: 'Maratona Completa',
+          date: new Date('2026-12-01'),
+          location: 'Av Paulista',
+          hasKit: true,
+        },
+        category: { name: '42KM' },
+        batch: { name: 'Lote VIP' },
+      },
+    };
+
+    vi.mocked(prisma.payment.findUnique).mockResolvedValueOnce(mockPayment as any);
+
+    const updatePaymentSpy = vi.fn();
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        payment: { update: updatePaymentSpy },
+        registration: { update: updateRegSpy },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processWebhook(job);
+
+    // Assert
+    expect(updatePaymentSpy).toHaveBeenCalledWith({
+      where: { id: 'pay_full' },
+      data: { status: 'PAID' },
+    });
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_full' },
+      data: {
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        receiptCode: expect.any(String),
+      },
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', {
+      to: 'full@test.com',
+      subject: 'Inscrição Confirmada!',
+      templateId: 'REGISTRATION_CONFIRMED',
+      tenantId: 'ten_1',
+      variables: {
+        userName: 'Atleta Full',
+        eventName: 'Maratona Completa',
+      },
+      attachments: expect.arrayContaining([
+        expect.objectContaining({
+          filename: expect.stringMatching(/^comprovante-.*\.pdf$/),
+          content: expect.any(String),
+        }),
+      ]),
+    });
+  });
+
+  // deve extrair tamanho de camiseta de complementaryData e cpf de metadata quando user.cpf for nulo
+  it('should fallback to complementaryData shirtSize and metadata cpf when user fields are null', async () => {
+    // Arrange
+    const job = createMockJob({
+      provider: 'asaas',
+      event: 'PAYMENT_CONFIRMED',
+      payload: { payment: { id: 'pay_asaas_comp' } },
+    });
+
+    const mockPayment = {
+      id: 'pay_comp',
+      registrationId: 'reg_comp',
+      tenantId: 'ten_1',
+      status: 'PENDING',
+      amount: 80.00,
+      registration: {
+        id: 'reg_comp',
+        eventId: 'evt_1',
+        metadata: {
+          complementaryData: { shirtSize: 'M' },
+          cpf: '99988877766',
+        },
+        user: { email: 'comp@test.com', name: null, cpf: null },
+        event: {
+          title: 'Corrida Noturna',
+          date: new Date('2026-10-31'),
+          location: 'Parque da Cidade',
+          hasKit: true,
+        },
+        category: null,
+        batch: null,
+      },
+    };
+
+    vi.mocked(prisma.payment.findUnique).mockResolvedValueOnce(mockPayment as any);
+
+    const updatePaymentSpy = vi.fn();
+    const updateRegSpy = vi.fn();
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        payment: { update: updatePaymentSpy },
+        registration: { update: updateRegSpy },
+      };
+      return callback(tx as any);
+    });
+
+    // Act
+    await processWebhook(job);
+
+    // Assert
+    expect(updateRegSpy).toHaveBeenCalledWith({
+      where: { id: 'reg_comp' },
+      data: {
+        status: 'CONFIRMED',
+        paymentStatus: 'PAID',
+        receiptCode: expect.any(String),
+      },
+    });
+    expect(mockEmailQueue.add).toHaveBeenCalledWith('send-email', expect.objectContaining({
+      to: 'comp@test.com',
+      attachments: expect.any(Array),
+    }));
   });
 
   // deve retornar de imediato em expiracao/atraso se a inscricao nao estiver PENDING/QUEUED

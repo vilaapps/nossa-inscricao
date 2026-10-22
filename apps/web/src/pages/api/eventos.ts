@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { PrismaClient } from '@prisma/client';
+import { validateEventPayload, normalizeEventPayload, validateBatchPlan, sanitizeGoogleMapsEmbedUrl, sanitizeYouTubeEmbedUrl } from '@syncflow/shared';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const auth = locals.auth();
@@ -30,22 +31,34 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const tenantId = user.tenantId || 'tenant-1';
     const body = await request.json();
     
-    const { title, description, date, availableSlots, eventType, location, locationUrl, bannerUrl, logoUrl, trailerUrl, categories, batches, contractText, contractPdf } = body;
+    const { title, description, date, availableSlots, eventType, location, locationUrl, bannerUrl, logoUrl, trailerUrl, categories, batches, contractText, contractPdf, hasKit, kitSizes, adminFeeRate, registrationOpensAt } = body;
 
-    // Validações básicas
-    if (!title || !date || !availableSlots) {
-      return new Response(JSON.stringify({ message: 'Título, data e limite de vagas são obrigatórios.' }), {
+    // Validação com regras compartilhadas de evento
+    const validation = validateEventPayload({
+      name: title,
+      date,
+      registrationOpensAt,
+      hasKit,
+      kitSizes,
+      adminFeeRate,
+    });
+
+    if (!validation.valid) {
+      return new Response(JSON.stringify({ message: validation.errors.join(' ') }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const selectedDate = new Date(date);
-    const now = new Date();
-    
-    // O evento deve acontecer estritamente no futuro
-    if (selectedDate <= now) {
-      return new Response(JSON.stringify({ message: 'A data e horário do evento devem ser no futuro.' }), {
+    const normalized = normalizeEventPayload({
+      hasKit,
+      kitSizes,
+      adminFeeRate,
+    });
+
+    // Validações básicas
+    if (!title || !date || !availableSlots) {
+      return new Response(JSON.stringify({ message: 'Título, data e limite de vagas são obrigatórios.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -58,7 +71,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    const totalCategorySlots = categories.reduce((sum: number, cat: any) => sum + Number(cat.slots || 0), 0);
+    const totalCategorySlots = categories.reduce((sum: number, cat: any) => sum + Number(cat.slots || cat.totalSlots || 0), 0);
     if (totalCategorySlots > Number(availableSlots)) {
       return new Response(JSON.stringify({ message: `A soma das vagas das categorias (${totalCategorySlots}) não pode ultrapassar o limite geral do evento (${availableSlots}).` }), {
         status: 400,
@@ -66,11 +79,43 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    if (!batches || batches.length === 0) {
-      return new Response(JSON.stringify({ message: 'O evento precisa ter pelo menos um lote ativo de inscrição.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    // Validar plano de lotes para cada categoria
+    for (const cat of categories) {
+      const catBatches = cat.batches && cat.batches.length > 0 ? cat.batches : batches;
+      if (!catBatches || catBatches.length === 0) {
+        return new Response(JSON.stringify({ message: `A categoria "${cat.name}" precisa ter pelo menos um lote ativo de inscrição.` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const categoryTotalSlots = Number(cat.slots || cat.totalSlots || availableSlots);
+      const batchPlanResult = validateBatchPlan(
+        catBatches.map((b: any, index: number) => ({
+          name: b.name,
+          type: b.type || 'DATE',
+          position: b.position !== undefined ? Number(b.position) : index + 1,
+          price: Number(b.price || 0),
+          startDate: b.startDate,
+          endDate: b.endDate,
+          maxQuantity: b.maxQuantity !== undefined && b.maxQuantity !== null && b.maxQuantity !== '' ? Number(b.maxQuantity) : null,
+        })),
+        {
+          name: cat.name,
+          totalSlots: categoryTotalSlots,
+        },
+        {
+          date,
+          registrationOpensAt,
+        },
+      );
+
+      if (!batchPlanResult.valid) {
+        return new Response(JSON.stringify({ message: `Categoria "${cat.name}": ${batchPlanResult.errors.join(' ')}` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Gerar slug a partir do título de forma limpa
@@ -93,42 +138,71 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Criar o evento em cascata
-    const newEvent = await prisma.event.create({
-      data: {
-        title,
-        slug,
-        description: description || '',
-        date: new Date(date),
-        availableSlots: Number(availableSlots),
-        eventType: eventType || 'CORRIDA',
-        location: location || null,
-        locationUrl: locationUrl || null,
-        bannerUrl: bannerUrl || null,
-        logoUrl: logoUrl || null,
-        trailerUrl: trailerUrl || null,
-        status: 'DRAFT',
-        tenantId,
-        contractText: contractText || null,
-        contractPdf: contractPdf || null,
-        categories: {
-          create: categories.map((cat: any) => ({
+    // Criar o evento, categorias e lotes em transação
+    const newEvent = await prisma.$transaction(async (tx) => {
+      const createdEvent = await tx.event.create({
+        data: {
+          title,
+          slug,
+          description: description || '',
+          date: new Date(date),
+          registrationOpensAt: registrationOpensAt ? new Date(registrationOpensAt) : null,
+          availableSlots: Number(availableSlots),
+          eventType: eventType || 'CORRIDA',
+          hasKit: normalized.hasKit,
+          kitSizes: normalized.kitSizes,
+          adminFeeRate: normalized.adminFeeRate,
+          location: location || null,
+          locationUrl: sanitizeGoogleMapsEmbedUrl(locationUrl),
+          bannerUrl: bannerUrl || null,
+          logoUrl: logoUrl || null,
+          trailerUrl: sanitizeYouTubeEmbedUrl(trailerUrl),
+          status: 'DRAFT',
+          tenantId,
+          contractText: contractText || null,
+          contractPdf: contractPdf || null,
+        },
+      });
+
+      for (const cat of categories) {
+        const catTotalSlots = Number(cat.slots || cat.totalSlots || availableSlots);
+        const createdCategory = await tx.category.create({
+          data: {
+            eventId: createdEvent.id,
+            tenantId,
             name: cat.name,
             gender: cat.gender || 'MISTO',
+            minAge: cat.minAge ? Number(cat.minAge) : null,
+            maxAge: cat.maxAge ? Number(cat.maxAge) : null,
             price: 0,
-            availableSlots: Number(cat.slots || availableSlots),
-            tenantId,
-          })),
-        },
-        batches: {
-          create: batches.map((bat: any, index: number) => ({
-            name: bat.name,
-            price: bat.price.toString(),
-            active: index === 0, // Primeiro lote ativo por padrão
-            tenantId,
-          })),
-        },
-      },
+            totalSlots: catTotalSlots,
+            availableSlots: catTotalSlots,
+          },
+        });
+
+        const catBatches = cat.batches && cat.batches.length > 0 ? cat.batches : batches;
+        for (let i = 0; i < catBatches.length; i++) {
+          const bat = catBatches[i];
+          await tx.batch.create({
+            data: {
+              eventId: createdEvent.id,
+              categoryId: createdCategory.id,
+              tenantId,
+              name: bat.name,
+              price: bat.price.toString(),
+              type: bat.type || 'DATE',
+              position: bat.position !== undefined ? Number(bat.position) : i + 1,
+              startDate: bat.startDate ? new Date(bat.startDate) : null,
+              endDate: bat.endDate ? new Date(bat.endDate) : null,
+              maxQuantity: bat.maxQuantity !== undefined && bat.maxQuantity !== null && bat.maxQuantity !== '' ? Number(bat.maxQuantity) : null,
+              soldQuantity: 0,
+              active: i === 0,
+            },
+          });
+        }
+      }
+
+      return createdEvent;
     });
 
     return new Response(JSON.stringify({ success: true, eventId: newEvent.id }), {

@@ -1,5 +1,10 @@
 import { Resend } from 'resend';
 
+export interface EmailAttachment {
+  filename: string;
+  content: string; // Base64 ou buffer string
+}
+
 export class ResendService {
   private readonly globalResend: Resend;
   private readonly defaultFrom: string;
@@ -10,23 +15,33 @@ export class ResendService {
     this.defaultFrom = defaultFrom ?? process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
   }
 
-  // Envia um e-mail com templates HTML customizados
+  // Envia um e-mail com templates HTML customizados e anexos opcionais
   async sendEmail(
     to: string,
     subject: string,
     html: string,
     customApiKey?: string,
-    from?: string
+    from?: string,
+    attachments?: EmailAttachment[],
   ): Promise<{ id: string }> {
     const resendClient = customApiKey ? new Resend(customApiKey) : this.globalResend;
     const sender = from ?? this.defaultFrom;
 
-    const response = await resendClient.emails.send({
+    const payload: any = {
       from: sender,
       to,
       subject,
       html,
-    });
+    };
+
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments.map((att) => ({
+        filename: att.filename,
+        content: att.content,
+      }));
+    }
+
+    const response = await resendClient.emails.send(payload);
 
     if (response.error) {
       throw new Error(`Failed to send email: ${response.error.message}`);

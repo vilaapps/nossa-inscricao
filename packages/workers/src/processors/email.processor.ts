@@ -42,12 +42,17 @@ export function buildHtmlTemplate(templateId: string, subject: string, variables
   } else if (templateId === 'REGISTRATION_CONFIRMED') {
     const userName = variables.userName || 'Participante';
     const eventName = variables.eventName || 'Evento';
+    const isFree = variables.isFree === 'true';
+
+    const statusMessage = isFree
+      ? `Sua inscrição para o evento <strong>${eventName}</strong> está oficialmente <strong>CONFIRMADA</strong>!`
+      : `Grandes notícias! Seu pagamento foi confirmado e sua inscrição para o evento <strong>${eventName}</strong> está oficialmente <strong>CONFIRMADA</strong>!`;
 
     content = `
       <div style="font-family: system-ui, -apple-system, sans-serif; color: #334155; line-height: 1.6; font-size: 16px;">
         <h2 style="color: #0f172a; font-size: 20px; font-weight: 600; margin-top: 0;">Olá, ${userName}!</h2>
-        <p>Grandes notícias! Seu pagamento foi confirmado e sua inscrição para o evento <strong>${eventName}</strong> está oficialmente <strong>CONFIRMADA</strong>!</p>
-        <p>Prepare-se para uma experiência incrível. Em breve enviaremos mais detalhes sobre o evento e o credenciamento.</p>
+        <p>${statusMessage}</p>
+        <p>Prepare-se para uma experiência incrível. Em anexo, enviamos o seu comprovante oficial de inscrição.</p>
         <div style="margin-top: 24px; text-align: center;">
           <a href="#" style="background-color: ${accentColor}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Ver Detalhes do Evento</a>
         </div>
@@ -75,6 +80,18 @@ export function buildHtmlTemplate(templateId: string, subject: string, variables
         <p>Olá, ${userName},</p>
         <p>Sua inscrição no evento <strong>${eventName}</strong> foi cancelada e o valor pago foi estornado com sucesso.</p>
         <p>O reembolso será processado de acordo com a forma original de pagamento. Em caso de dúvidas, entre em contato com a organização do evento.</p>
+      </div>
+    `;
+  } else if (templateId === 'REGISTRATION_BATCH_CLOSED') {
+    const userName = variables.userName || 'Participante';
+    const eventName = variables.eventName || 'Evento';
+
+    content = `
+      <div style="font-family: system-ui, -apple-system, sans-serif; color: #334155; line-height: 1.6; font-size: 16px;">
+        <h2 style="color: #ef4444; font-size: 20px; font-weight: 600; margin-top: 0;">Lote de Inscrição Encerrado</h2>
+        <p>Olá, ${userName},</p>
+        <p>O lote de inscrição selecionado para o evento <strong>${eventName}</strong> foi encerrado ou esgotado antes da conclusão da sua solicitação.</p>
+        <p>Por favor, acesse a página do evento e confira os lotes vigentes para efetuar uma nova inscrição.</p>
       </div>
     `;
   } else {
@@ -116,12 +133,16 @@ export function buildHtmlTemplate(templateId: string, subject: string, variables
 
 // Processador encarregado de enviar e-mails reais usando o Resend Service
 export async function processEmail(job: Job<EmailJobData>): Promise<void> {
-  const { to, subject, templateId, variables } = job.data;
+  const { to, subject, templateId, variables, attachments } = job.data;
 
   // Constrói o HTML com base no template e variáveis
   const html = buildHtmlTemplate(templateId, subject, variables);
 
   const resendService = new ResendService();
   // Envia via Resend
-  await resendService.sendEmail(to, subject, html);
+  if (attachments && attachments.length > 0) {
+    await resendService.sendEmail(to, subject, html, undefined, undefined, attachments);
+  } else {
+    await resendService.sendEmail(to, subject, html);
+  }
 }
