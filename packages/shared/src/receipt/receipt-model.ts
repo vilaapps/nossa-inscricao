@@ -13,6 +13,7 @@ export interface ReceiptData {
   amountPaid: number;
   verificationUrl: string;
   issuedAt?: Date | string;
+  logoBuffer?: Buffer | null;
 }
 
 /**

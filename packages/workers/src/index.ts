@@ -29,7 +29,7 @@ async function bootstrap(): Promise<void> {
   const baseWorkerOptions = {
     connection: redisConnection,
     // Aumenta o tempo de checagem de jobs travados de 30s para 5 minutos
-    stalledInterval: 300000, 
+    stalledInterval: 300000,
   };
 
   const registrationWorker = new Worker(QueueName.REGISTRATION, processRegistration, {

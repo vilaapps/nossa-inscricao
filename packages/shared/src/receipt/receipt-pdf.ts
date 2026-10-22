@@ -7,6 +7,11 @@ import {
   formatReceiptBirthDate,
 } from './receipt-model';
 
+export const DEFAULT_APP_LOGO_BASE64 =
+  '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';
+
+const DEFAULT_APP_LOGO_BUFFER = Buffer.from(DEFAULT_APP_LOGO_BASE64, 'base64');
+
 /**
  * Renderiza um comprovante de inscrição oficial em formato PDF.
  * Inclui dados do evento, do atleta (com CPF mascarado), da categoria/lote,
@@ -29,7 +34,7 @@ export async function renderReceiptPdf(data: ReceiptData): Promise<Buffer> {
       margin: 40,
       info: {
         Title: `Comprovante - ${data.receiptCode}`,
-        Author: 'SyncFlow',
+        Author: 'NossaInscricao',
         Subject: `Comprovante de Inscrição - ${data.eventName}`,
       },
     });
@@ -45,18 +50,31 @@ export async function renderReceiptPdf(data: ReceiptData): Promise<Buffer> {
     const grayColor = '#4B5563'; // Ink-muted
     const lightBg = '#F3F4F6';
 
-    // 1. Cabeçalho / HUD
+    // 1. Cabeçalho / HUD com Ícone Oficial da Aplicação
+    const logoToRender =
+      data.logoBuffer !== undefined ? data.logoBuffer : DEFAULT_APP_LOGO_BUFFER;
+
+    if (logoToRender) {
+      try {
+        doc.image(logoToRender, 40, 38, { width: 36, height: 36 });
+      } catch {
+        // Fallback silencioso e gracioso caso o buffer customizado seja inválido
+      }
+    }
+
+    const titleX = logoToRender ? 86 : 40;
+
     doc
       .fillColor(primaryColor)
-      .fontSize(10)
+      .fontSize(9.5)
       .font('Helvetica-Bold')
-      .text('SYNCFLOW • SISTEMA DE GESTÃO ESPORTIVA', 40, 40, { characterSpacing: 1 });
+      .text('NOSSA INSCRIÇÃO • SISTEMA DE GESTÃO ESPORTIVA', titleX, 40, { characterSpacing: 0.5 });
 
     doc
       .fillColor(darkColor)
-      .fontSize(18)
+      .fontSize(15)
       .font('Helvetica-Bold')
-      .text('COMPROVANTE OFICIAL DE INSCRIÇÃO', 40, 56);
+      .text('COMPROVANTE OFICIAL DE INSCRIÇÃO', titleX, 55);
 
     // Box de Código de Verificação
     doc
