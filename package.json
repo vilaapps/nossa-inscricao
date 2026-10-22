@@ -19,7 +19,7 @@
     "api:local": "npm run start:local --workspace=api",
     "web:dev": "npm run dev --workspace=web",
     "web:local": "npm run dev:local --workspace=web",
-    "postinstall": "prisma generate --schema=apps/api/prisma/schema.prisma"
+    "postinstall": "prisma generate --schema=apps/api/prisma/schema.prisma && npm run build --workspace=@syncflow/shared"
   },
   "devDependencies": {
     "prisma": "^6.0.0",

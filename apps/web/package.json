@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node --env-file=../../.env ../../node_modules/astro/bin/astro.mjs dev --port 4321",
     "dev:local": "node --env-file=../../.env.dev.local ../../node_modules/astro/bin/astro.mjs dev --port 4321",
+    "prebuild": "npm run build --workspace=@syncflow/shared",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
