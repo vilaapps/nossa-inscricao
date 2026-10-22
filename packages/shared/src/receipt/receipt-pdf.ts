@@ -7,6 +7,11 @@ import {
   formatReceiptBirthDate,
 } from './receipt-model';
 
+import { DEFAULT_APP_LOGO_BASE64 } from './receipt-logo';
+
+export { DEFAULT_APP_LOGO_BASE64 };
+const DEFAULT_APP_LOGO_BUFFER = Buffer.from(DEFAULT_APP_LOGO_BASE64, 'base64');
+
 /**
  * Renderiza um comprovante de inscrição oficial em formato PDF.
  * Inclui dados do evento, do atleta (com CPF mascarado), da categoria/lote,
@@ -29,7 +34,7 @@ export async function renderReceiptPdf(data: ReceiptData): Promise<Buffer> {
       margin: 40,
       info: {
         Title: `Comprovante - ${data.receiptCode}`,
-        Author: 'SyncFlow',
+        Author: 'NossaInscricao',
         Subject: `Comprovante de Inscrição - ${data.eventName}`,
       },
     });
@@ -45,18 +50,31 @@ export async function renderReceiptPdf(data: ReceiptData): Promise<Buffer> {
     const grayColor = '#4B5563'; // Ink-muted
     const lightBg = '#F3F4F6';
 
-    // 1. Cabeçalho / HUD
+    // 1. Cabeçalho / HUD com Ícone Oficial da Aplicação
+    const logoToRender =
+      data.logoBuffer !== undefined ? data.logoBuffer : DEFAULT_APP_LOGO_BUFFER;
+
+    if (logoToRender) {
+      try {
+        doc.image(logoToRender, 40, 38, { width: 36, height: 36 });
+      } catch {
+        // Fallback silencioso e gracioso caso o buffer customizado seja inválido
+      }
+    }
+
+    const titleX = logoToRender ? 86 : 40;
+
     doc
       .fillColor(primaryColor)
-      .fontSize(10)
+      .fontSize(9.5)
       .font('Helvetica-Bold')
-      .text('SYNCFLOW • SISTEMA DE GESTÃO ESPORTIVA', 40, 40, { characterSpacing: 1 });
+      .text('NOSSA INSCRIÇÃO • SISTEMA DE GESTÃO ESPORTIVA', titleX, 40, { characterSpacing: 0.5 });
 
     doc
       .fillColor(darkColor)
-      .fontSize(18)
+      .fontSize(15)
       .font('Helvetica-Bold')
-      .text('COMPROVANTE OFICIAL DE INSCRIÇÃO', 40, 56);
+      .text('COMPROVANTE OFICIAL DE INSCRIÇÃO', titleX, 55);
 
     // Box de Código de Verificação
     doc

@@ -87,4 +87,56 @@ describe('renderReceiptPdf', () => {
     expect(buffer).toBeInstanceOf(Buffer);
     expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
   });
+
+  // Renderiza com logo customizado quando fornecido
+  it('should render PDF with custom logoBuffer when provided', async () => {
+    // Arrange: criar um PNG 1x1 simples em buffer
+    const customLogo = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const dataWithCustomLogo: ReceiptData = {
+      ...baseReceiptData,
+      logoBuffer: customLogo,
+    };
+
+    // Act
+    const buffer = await renderReceiptPdf(dataWithCustomLogo);
+
+    // Assert
+    expect(buffer).toBeInstanceOf(Buffer);
+    expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  // Renderiza sem logo quando logoBuffer é explicitamente null
+  it('should render PDF without logo when logoBuffer is null', async () => {
+    // Arrange
+    const dataWithoutLogo: ReceiptData = {
+      ...baseReceiptData,
+      logoBuffer: null,
+    };
+
+    // Act
+    const buffer = await renderReceiptPdf(dataWithoutLogo);
+
+    // Assert
+    expect(buffer).toBeInstanceOf(Buffer);
+    expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  // Trata fallback gracioso se logoBuffer for corrompido/inválido
+  it('should handle corrupted logo buffer gracefully without throwing', async () => {
+    // Arrange
+    const dataWithCorruptedLogo: ReceiptData = {
+      ...baseReceiptData,
+      logoBuffer: Buffer.from('corrupted_not_a_valid_image'),
+    };
+
+    // Act
+    const buffer = await renderReceiptPdf(dataWithCorruptedLogo);
+
+    // Assert
+    expect(buffer).toBeInstanceOf(Buffer);
+    expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  });
 });
