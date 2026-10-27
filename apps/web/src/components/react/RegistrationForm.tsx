@@ -393,16 +393,10 @@ export default function RegistrationForm({
 
       const data = await response.json();
       setRegistrationId(data.id);
+      setAmount(isFree ? 0 : orderCalc.total);
+      setPaymentStatus('PENDING');
 
-      // Se for gratuito, avança imediatamente para tela de sucesso sem pagamento
-      if (isFree) {
-        setAmount(0);
-        setPaymentStatus('PAID');
-        setStep(4);
-        return;
-      }
-
-      // Inicia Passo 4 (Pagamento)
+      // Inicia Passo 4 (Aguardando Confirmação do Worker ou Pagamento)
       setStep(4);
     } catch (err: any) {
       setSubmissionError(err.message || 'Erro ao submeter inscrição.');
@@ -411,9 +405,9 @@ export default function RegistrationForm({
     }
   };
 
-  // Polling para acompanhar processamento da fila de reserva e geracao do PIX (apenas se não for gratuito)
+  // Polling para acompanhar processamento da fila de reserva (gratuito ou pago)
   useEffect(() => {
-    if (step !== 4 || !registrationId || isFree || paymentStatus === 'PAID') return;
+    if (step !== 4 || !registrationId || paymentStatus === 'PAID') return;
 
     let timer: NodeJS.Timeout;
 
@@ -449,17 +443,17 @@ export default function RegistrationForm({
         }
 
         setPollingAttempts((prev) => prev + 1);
-        timer = setTimeout(pollStatus, 3000);
+        timer = setTimeout(pollStatus, 2000);
       } catch (err) {
         console.error('Erro no polling:', err);
-        timer = setTimeout(pollStatus, 4000);
+        timer = setTimeout(pollStatus, 3000);
       }
     };
 
     pollStatus();
 
     return () => clearTimeout(timer);
-  }, [step, registrationId, isFree, paymentStatus]);
+  }, [step, registrationId, paymentStatus]);
 
   const handleCopyPix = () => {
     if (!pixQrCode) return;
@@ -1057,6 +1051,59 @@ export default function RegistrationForm({
             </div>
           )}
 
+          {paymentStatus === 'PENDING' && isFree && (
+            <div className="py-8 space-y-6 flex flex-col items-center max-w-lg mx-auto">
+              <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent animate-spin rounded-full mx-auto"></div>
+
+              <div>
+                <h2 className="font-heading text-xl md:text-2xl font-bold text-ink uppercase tracking-wider">
+                  Garantindo sua Vaga Gratuita...
+                </h2>
+                <p className="text-ink-muted text-sm md:text-base mt-2 max-w-md mx-auto leading-relaxed font-sans">
+                  Estamos validando a disponibilidade de vagas e reservando sua inscrição em nossa fila de alta performance.
+                </p>
+              </div>
+
+              <div className="border border-ink-muted/20 bg-surface p-5 text-sm max-w-md w-full space-y-3 font-mono text-left">
+                <div className="flex justify-between text-ink-muted">
+                  <span className="uppercase">Inscrição ID</span>
+                  <span className="text-ink font-bold">{registrationId ? `${registrationId.substring(0, 13)}...` : 'Gerando...'}</span>
+                </div>
+                <div className="flex justify-between text-ink-muted">
+                  <span className="uppercase">Status</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold uppercase flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+                    Processando Inscrição
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-ink-muted/20 pt-6 flex flex-col items-center gap-3 text-sm w-full">
+                <span className="text-ink-muted text-xs uppercase flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  Aguardando confirmação do servidor (Tentativa {pollingAttempts})
+                </span>
+
+                {pollingAttempts >= 10 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 p-4 text-xs text-amber-700 dark:text-amber-300 space-y-2 mt-2 w-full text-center font-sans">
+                    <p className="font-semibold">
+                      Sua solicitação está na fila de espera.
+                    </p>
+                    <p className="text-ink-muted">
+                      Você pode aguardar aqui ou acompanhar o status no seu painel de inscrições.
+                    </p>
+                    <a
+                      href="/painel"
+                      className="inline-block mt-2 bg-surface border border-ink-muted/30 hover:border-accent text-ink px-4 py-2 uppercase text-xs font-bold tracking-wider font-mono transition-colors"
+                    >
+                      Ir para Minhas Inscrições
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {paymentStatus === 'PAID' && (
             <div className="py-8 space-y-6 flex flex-col items-center">
               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl font-bold animate-bounce">
@@ -1127,10 +1174,16 @@ export default function RegistrationForm({
 
               <div>
                 <h2 className="font-heading text-2xl md:text-3xl font-bold text-ink uppercase tracking-wider">
-                  {paymentMethod === 'PIX' ? 'Tempo Esgotado!' : 'Pagamento Recusado'}
+                  {isFree
+                    ? 'Inscrição Não Confirmada'
+                    : paymentMethod === 'PIX'
+                    ? 'Tempo Esgotado!'
+                    : 'Pagamento Recusado'}
                 </h2>
                 <p className="text-red-500 dark:text-red-400 text-sm mt-2 max-w-md mx-auto leading-relaxed font-sans">
-                  {paymentMethod === 'PIX'
+                  {isFree
+                    ? 'Não foi possível confirmar sua vaga gratuita. As vagas podem ter se esgotado na fila ou o lote foi encerrado.'
+                    : paymentMethod === 'PIX'
                     ? 'O tempo limite para pagamento do PIX desta vaga expirou ou a inscrição foi cancelada pelo sistema.'
                     : 'A transação com o seu cartão de crédito foi recusada pelo gateway de pagamento.'}
                 </p>
