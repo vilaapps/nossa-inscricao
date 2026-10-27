@@ -44,7 +44,12 @@ const formatCurrency = (val: number) => {
 };
 
 // Mapeamento de Cores de Status
-const getStatusClasses = (status: string, paymentStatus: string, context: 'ACTIVE' | 'CANCELLED' | 'PAST') => {
+const getStatusClasses = (
+  status: string,
+  paymentStatus: string,
+  context: 'ACTIVE' | 'CANCELLED' | 'PAST',
+  amountPaid: number = 0,
+) => {
   // 1. Contexto de Evento que já passou
   if (context === 'PAST') {
     if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
@@ -78,13 +83,24 @@ const getStatusClasses = (status: string, paymentStatus: string, context: 'ACTIV
   }
 
   // 3. Contexto Vigente
+  const isFree = amountPaid === 0;
+
   if (status === 'CONFIRMED' || paymentStatus === 'PAID') {
     return {
       bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
-      label: 'Confirmada & Paga',
+      label: isFree ? 'Inscrição Confirmada' : 'Confirmada & Paga',
       indicator: 'bg-emerald-500',
     };
   }
+
+  if (isFree) {
+    return {
+      bg: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
+      label: 'Processando Inscrição',
+      indicator: 'bg-blue-500',
+    };
+  }
+
   return {
     bg: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400',
     label: 'Aguardando Pagamento',
@@ -145,7 +161,7 @@ const pastRegistrations = registrations.filter(r =>
       ) : (
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
           {activeRegistrations.map((reg) => {
-            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'ACTIVE');
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'ACTIVE', Number(reg.amountPaid));
             const isPending = reg.status === 'PENDING' || reg.status === 'QUEUED';
             const pixCode = reg.payment?.pixQrCode;
 
@@ -266,7 +282,7 @@ const pastRegistrations = registrations.filter(r =>
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-75 hover:opacity-100 transition-opacity duration-300">
           {cancelledRegistrations.map((reg) => {
-            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'CANCELLED');
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'CANCELLED', Number(reg.amountPaid));
 
             return (
               <div class="bg-surface-alt border border-red-500/20 p-6 md:p-8 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300 shadow-sm">
@@ -323,7 +339,7 @@ const pastRegistrations = registrations.filter(r =>
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 opacity-75 hover:opacity-100 transition-opacity duration-300">
           {pastRegistrations.map((reg) => {
-            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'PAST');
+            const statusConfig = getStatusClasses(reg.status, reg.paymentStatus, 'PAST', Number(reg.amountPaid));
 
             return (
               <div class="bg-surface-alt border border-ink-muted/20 p-6 md:p-8 flex flex-col justify-between relative group grayscale hover:grayscale-0 transition-all duration-300 shadow-sm">
