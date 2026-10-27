@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
@@ -7,6 +7,7 @@ import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RegistrationsModule } from './registrations/registrations.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { CouponsModule } from './coupons/coupons.module';
+import { LoggingMiddleware } from './infrastructure/logging/logging.middleware';
 
 @Module({
   imports: [
@@ -45,4 +46,8 @@ import { CouponsModule } from './coupons/coupons.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(LoggingMiddleware).forRoutes('*');
+  }
+}
