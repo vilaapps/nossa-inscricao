@@ -10,7 +10,11 @@ import {
 import { DEFAULT_APP_LOGO_BASE64 } from './receipt-logo';
 
 export { DEFAULT_APP_LOGO_BASE64 };
-const DEFAULT_APP_LOGO_BUFFER = Buffer.from(DEFAULT_APP_LOGO_BASE64, 'base64');
+
+function getDefaultAppLogoBuffer(): Buffer {
+  return Buffer.from(DEFAULT_APP_LOGO_BASE64, 'base64');
+}
+
 
 /**
  * Renderiza um comprovante de inscrição oficial em formato PDF.
@@ -52,7 +56,7 @@ export async function renderReceiptPdf(data: ReceiptData): Promise<Buffer> {
 
     // 1. Cabeçalho / HUD com Ícone Oficial da Aplicação
     const logoToRender =
-      data.logoBuffer !== undefined ? data.logoBuffer : DEFAULT_APP_LOGO_BUFFER;
+      data.logoBuffer !== undefined ? data.logoBuffer : getDefaultAppLogoBuffer();
 
     if (logoToRender) {
       try {
