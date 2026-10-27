@@ -130,18 +130,18 @@ const pastRegistrations = registrations.filter(r =>
 ---
 
 <BaseLayout title="Minhas Inscrições — Painel do Participante">
-  <section class="bg-surface border-b border-ink-muted/20 py-12 px-6">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4 font-mono">
+  <section class="bg-surface border-b border-ink-muted/20 py-8 sm:py-12 px-4 sm:px-6 w-full min-w-0">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4 font-mono w-full min-w-0">
       <div>
         <div class="text-xs uppercase tracking-widest text-ink-muted mb-2 font-medium">Painel do Atleta</div>
-        <h1 class="font-heading text-3xl font-extrabold uppercase text-ink tracking-wider">
+        <h1 class="font-heading text-2xl sm:text-3xl font-extrabold uppercase text-ink tracking-wider">
           Minhas Inscrições
         </h1>
       </div>
     </div>
   </section>
 
-  <section class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full space-y-16">
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-grow w-full min-w-0 space-y-12 sm:space-y-16">
     {/* VIGENTES */}
     <div>
       <h2 class="font-heading text-xl md:text-2xl font-bold uppercase text-ink tracking-wider mb-6 border-b border-ink-muted/20 pb-4">
@@ -225,17 +225,17 @@ const pastRegistrations = registrations.filter(r =>
                         />
                       </div>
 
-                      <div class="space-y-1.5">
+                      <div class="space-y-1.5 w-full min-w-0">
                         <span class="text-xs text-ink-muted uppercase font-semibold">PIX Copia e Cola</span>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 w-full min-w-0">
                           <input
                             type="text"
                             readonly
                             value={pixCode}
-                            class="bg-surface-alt border border-ink-muted/20 text-ink px-3 py-2.5 text-xs md:text-sm flex-grow outline-none truncate font-mono"
+                            class="bg-surface-alt border border-ink-muted/20 text-ink px-3 py-2.5 text-xs md:text-sm flex-grow outline-none truncate font-mono min-w-0"
                           />
                           <button
-                            class="pix-copy-btn bg-surface border border-ink-muted/30 hover:border-accent text-ink px-4 py-2.5 text-xs md:text-sm font-bold uppercase transition-colors cursor-pointer"
+                            class="pix-copy-btn bg-surface border border-ink-muted/30 hover:border-accent text-ink px-4 py-2.5 text-xs md:text-sm font-bold uppercase transition-colors cursor-pointer shrink-0"
                             data-pix={pixCode}
                           >
                             Copiar

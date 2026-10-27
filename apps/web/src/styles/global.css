@@ -45,12 +45,25 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-surface-alt);
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
   background-color: var(--bg-surface);
   color: var(--text-ink);
   min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* Ocultar barra de rolagem mantendo funcional */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom scrollbar para Minimal Tech */

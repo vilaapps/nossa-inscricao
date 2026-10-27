@@ -129,8 +129,8 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
 
 <BaseLayout title={event.title} description={event.description || ''}>
   <!-- Top Header HUD -->
-  <section class="bg-surface border-b border-ink-muted/20 py-8 px-6">
-    <div class="max-w-7xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2">
+  <section class="bg-surface border-b border-ink-muted/20 py-6 sm:py-8 px-4 sm:px-6 w-full min-w-0">
+    <div class="max-w-7xl mx-auto flex flex-col items-start font-mono text-xs tracking-widest text-ink-muted gap-2 w-full min-w-0">
       <a href="/" class="hover:text-accent transition-colors uppercase flex items-center gap-1.5 mb-2">
         &larr; Voltar para a listagem
       </a>
@@ -141,7 +141,7 @@ O participante cede gratuitamente os direitos de uso de sua imagem (fotos e víd
   </section>
 
   <!-- Corpo da Página -->
-  <section class="max-w-7xl mx-auto px-6 py-12 flex-grow">
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex-grow w-full min-w-0">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
       <!-- Coluna Esquerda: Informações do Evento (2/3) -->
       <div class="lg:col-span-2 space-y-8">

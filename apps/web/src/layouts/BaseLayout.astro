@@ -74,14 +74,14 @@ if (userId) {
       window.localStorage.setItem('theme', theme);
     </script>
   </head>
-  <body class="flex flex-col min-h-dvh font-sans">
+  <body class="flex flex-col min-h-dvh font-sans overflow-x-clip w-full max-w-full">
     <!-- Header Minimal Tech / Asymmetric HUD -->
     <header class="sticky top-0 z-50 w-full bg-surface/80 backdrop-blur-md border-b border-surface-alt">
-      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
         <!-- Logo -->
-        <a href="/" class="font-heading text-xl font-black tracking-tighter text-ink flex items-baseline hover:opacity-90 transition-opacity">
-          <span class="text-3xl text-accent">N<span class="inline-block w-2.5 h-2.5 bg-accent translate-x-0.5 -translate-y-0.5"></span></span>
-          <span class="ml-2 tracking-tight">Nossa Inscrição<span class="text-accent">.</span></span>
+        <a href="/" class="font-heading text-lg sm:text-xl font-black tracking-tighter text-ink flex items-baseline hover:opacity-90 transition-opacity shrink-0">
+          <span class="text-2xl sm:text-3xl text-accent">N<span class="inline-block w-2.5 h-2.5 bg-accent translate-x-0.5 -translate-y-0.5"></span></span>
+          <span class="ml-1.5 sm:ml-2 tracking-tight">Nossa Inscrição<span class="text-accent">.</span></span>
         </a>
 
         <!-- Navigation Links -->
@@ -115,9 +115,9 @@ if (userId) {
         </nav>
 
         <!-- Clerk Auth Actions -->
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <!-- Theme Toggle -->
-          <button id="theme-toggle" class="p-2 text-ink-muted hover:text-ink transition-colors cursor-pointer" aria-label="Alternar tema">
+          <button id="theme-toggle" class="p-1.5 sm:p-2 text-ink-muted hover:text-ink transition-colors cursor-pointer" aria-label="Alternar tema">
             <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
@@ -133,14 +133,14 @@ if (userId) {
               <UserButton />
             </>
           ) : (
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 sm:gap-2">
               <SignInButton mode="modal" asChild>
-                <button class="text-ink-muted hover:text-ink text-xs uppercase tracking-widest font-semibold px-3 py-2 transition-colors cursor-pointer">
+                <button class="text-ink-muted hover:text-ink text-[11px] sm:text-xs uppercase tracking-wider sm:tracking-widest font-semibold px-2 sm:px-3 py-1.5 sm:py-2 transition-colors cursor-pointer">
                   Login
                 </button>
               </SignInButton>
               <SignUpButton mode="modal" asChild>
-                <button class="bg-accent hover:opacity-90 text-white text-xs uppercase tracking-widest font-bold px-4 py-2 transition-all cursor-pointer shadow-sm">
+                <button class="bg-accent hover:opacity-90 text-white text-[11px] sm:text-xs uppercase tracking-wider sm:tracking-widest font-bold px-2.5 sm:px-4 py-1.5 sm:py-2 transition-all cursor-pointer shadow-sm whitespace-nowrap">
                   Criar Conta
                 </button>
               </SignUpButton>
@@ -151,13 +151,13 @@ if (userId) {
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-grow flex flex-col">
+    <main class="flex-grow flex flex-col w-full max-w-full min-w-0">
       <slot />
     </main>
 
     <!-- Footer -->
-    <footer class="w-full bg-surface-alt border-t border-ink-muted/20 py-8 text-center text-xs text-ink-muted font-medium tracking-widest uppercase">
-      <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+    <footer class="w-full bg-surface-alt border-t border-ink-muted/20 py-8 text-center text-xs text-ink-muted font-medium tracking-wider sm:tracking-widest uppercase">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>&copy; {new Date().getFullYear()} NOSSA INSCRIÇÃO. TODOS OS DIREITOS RESERVADOS.</div>
         <div class="flex items-center space-x-6 text-xs">
           <a href="/termos" class="hover:text-ink transition-colors">Termos</a>
