@@ -467,22 +467,34 @@ export default function RegistrationForm({
       <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-ink-muted/30 pointer-events-none"></div>
 
       {/* Barra de Progresso HUD */}
-      <div className="mb-8 font-mono text-xs md:text-sm tracking-widest text-ink-muted flex items-center justify-between border-b border-ink-muted/20 pb-4">
-        <div className="flex items-center gap-4 md:gap-6 flex-wrap">
-          <span className={step === 1 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>
+      <div className="mb-8 font-mono text-xs md:text-sm tracking-wider text-ink-muted flex items-center justify-between border-b border-ink-muted/20 pb-4 gap-4">
+        {/* Mobile (< sm): Apenas etapa ativa */}
+        <div className="sm:hidden flex items-center text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate">
+          {step === 1 && '01 // CATEGORIA'}
+          {step === 2 && '02 // DADOS ATLETA'}
+          {step === 3 && '03 // REVISÃO'}
+          {step === 4 && (isFree ? '04 // CONFIRMAÇÃO' : '04 // CHECKOUT')}
+        </div>
+
+        {/* Tablet / Desktop (>= sm): Todas as etapas em linha única sem quebra */}
+        <div className="hidden sm:flex items-center gap-3 md:gap-5 flex-nowrap shrink">
+          <span className={step === 1 ? 'text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap' : 'text-ink-muted/60 whitespace-nowrap'}>
             01 // CATEGORIA
           </span>
-          <span className={step === 2 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>
-            02 // DADOS ATLETA
+          <span className={step === 2 ? 'text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap' : 'text-ink-muted/60 whitespace-nowrap'}>
+            02 // DADOS <span className="hidden lg:inline">ATLETA</span>
           </span>
-          <span className={step === 3 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>
+          <span className={step === 3 ? 'text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap' : 'text-ink-muted/60 whitespace-nowrap'}>
             03 // REVISÃO
           </span>
-          <span className={step === 4 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-ink-muted/60'}>
+          <span className={step === 4 ? 'text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap' : 'text-ink-muted/60 whitespace-nowrap'}>
             04 // {isFree ? 'CONFIRMAÇÃO' : 'CHECKOUT'}
           </span>
         </div>
-        <div className="text-ink-muted font-bold">PASSO {step} DE 4</div>
+
+        <div className="text-ink-muted font-bold whitespace-nowrap shrink-0 text-xs md:text-sm">
+          PASSO {step} DE 4
+        </div>
       </div>
 
       {submissionError && (
