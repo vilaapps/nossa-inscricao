@@ -1,41 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { configureApp } from './app.config';
+import { getCorsOptions } from './cors.config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Prefixo global e validação centralizada
+  // Prefixo global, validação centralizada e filtro de exceções
   configureApp(app);
 
-  // CORS habilitado (suporta múltiplos domínios separados por vírgula)
-  const allowedOrigins = process.env.WEB_URL
-    ? process.env.WEB_URL.split(',').map((origin) => origin.trim())
-    : ['http://localhost:4321'];
-
-  app.enableCors({
-    origin: (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => {
-      // Habilita CORS se for local, se o origin for vazio (ex: mobile, server-to-server),
-      // se estiver na lista de permitidos, ou se for qualquer subdomínio da Vercel.
-      if (
-        !origin ||
-        process.env.NODE_ENV === 'development' ||
-        allowedOrigins.includes(origin) ||
-        origin.endsWith('.vercel.app') ||
-        /\.vercel\.app$/.test(origin)
-      ) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
-    credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-  });
+  // CORS robusto com suporte a produção, subdomínios e logging preventivo
+  app.enableCors(getCorsOptions());
 
   // Configuração do Swagger
   const config = new DocumentBuilder()
